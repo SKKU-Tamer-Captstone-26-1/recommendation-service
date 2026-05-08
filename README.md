@@ -1,10 +1,27 @@
 # recommendation-service
 
+| Area | Technology |
+|---|---|
+| Language | Python 3.12+ |
+| Service Transport | gRPC |
+| HTTP Health / Debug | FastAPI, Uvicorn |
+| Data Validation / Config | Pydantic, Pydantic Settings |
+| Database | PostgreSQL, PostGIS |
+| ORM / Migrations | SQLAlchemy, Alembic |
+| Vector Index | Qdrant |
+| Inter-Service Clients | gRPC, HTTPX |
+| Testing / Linting | Pytest, Ruff |
+| Local Development | Docker, Docker Compose |
+
 AI-first backend service for On the Block recommendations.
 
 This repository owns derived recommendation state only. It generates taste
 profiles, recommendation vectors, scoring metadata, explanations, and
 recommendation logs from survey data owned by `survey-service`.
+
+The platform is MSA-based and uses gRPC for service-to-service communication.
+FastAPI remains in this repository for operational health/status endpoints and
+local debugging only.
 
 ## Why This File Exists
 
@@ -115,20 +132,34 @@ For sync or rebuild changes, also read:
 
 ## Development Workflow
 
-Expected local workflow once implementation files exist:
+Expected local workflow:
 
-```text
-1. Copy .env.example to .env and fill local values.
-2. Start local infrastructure with docker-compose.
-3. Install Python dependencies from pyproject.toml.
-4. Run migrations.
-5. Start the API process.
-6. Start the background worker process.
-7. Run tests before committing.
+```bash
+cp .env.example .env
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+docker compose up -d postgres qdrant
+alembic upgrade head
+python -m app.grpc.main
+uvicorn app.main:app --reload
 ```
 
-Concrete commands should be added here only after the implementation and tooling
-are present.
+Docker-only workflow:
+
+```bash
+docker compose run --rm api alembic upgrade head
+docker compose up --build grpc api
+```
+
+Useful checks:
+
+```bash
+curl http://localhost:8000/health/live
+curl http://localhost:8000/health/ready
+curl http://localhost:8000/v1/status
+grpcurl -plaintext localhost:50051 grpc.health.v1.Health/Check
+```
 
 ## Environment Configuration
 
@@ -140,6 +171,7 @@ Rules:
 - Local defaults SHOULD be safe and non-production.
 - Environment names MUST be stable and descriptive.
 - Service URLs MUST target service APIs, not service databases.
+- gRPC addresses SHOULD be used for MSA service-to-service calls.
 - JWT configuration MUST verify tokens issued by `auth-service`; this service
   MUST NOT issue JWTs.
 

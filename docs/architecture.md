@@ -67,6 +67,10 @@ Client
       -> recommendation-service
 ```
 
+Service-to-service communication is gRPC-first. HTTP in this repository is
+reserved for health/status endpoints and local debugging unless explicitly
+documented otherwise.
+
 Service ownership:
 
 | Service | Owns | Does Not Own |
@@ -113,11 +117,11 @@ sequenceDiagram
     participant Q as Qdrant
 
     Client->>Gateway: Submit survey
-    Gateway->>Survey: Forward authenticated request
+    Gateway->>Survey: Forward authenticated gRPC request
     Survey->>Survey: Store raw answers
     Survey-->>Client: Survey completed
-    Recs->>Survey: Poll/fetch survey event
-    Recs->>Survey: Fetch canonical survey response
+    Recs->>Survey: List survey events by gRPC cursor
+    Recs->>Survey: Fetch canonical survey response by gRPC
     Recs->>PG: Store derived profile revision
     Recs->>PG: Store canonical recommendation vector
     Recs->>Q: Upsert vector point
@@ -135,7 +139,7 @@ sequenceDiagram
     participant Q as Qdrant
 
     Client->>Gateway: Request recommendations with JWT
-    Gateway->>Recs: Forward authenticated request
+    Gateway->>Recs: Forward authenticated gRPC request
     Recs->>PG: Load active profile revision
     Recs->>Q: Retrieve vector candidates
     Recs->>PG: Hydrate candidates and scoring metadata
@@ -148,7 +152,8 @@ sequenceDiagram
 
 MVP deployment SHOULD use:
 
-- One FastAPI application container.
+- One gRPC service process/container.
+- Optional FastAPI health/debug process/container.
 - One background worker process/container for sync and indexing.
 - PostgreSQL with PostGIS.
 - Qdrant with persistent volume.
@@ -165,4 +170,3 @@ MVP deployment SHOULD NOT require Kafka, Airflow, Redis, or an ML serving stack.
   marked `pending` or `failed`.
 - If recommendation profile is missing, APIs return a typed profile status rather
   than inventing recommendations from raw survey data.
-

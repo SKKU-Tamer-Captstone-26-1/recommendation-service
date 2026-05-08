@@ -1,8 +1,8 @@
-# Recommendation API
+# Recommendation gRPC API
 
 ## Purpose
 
-This document defines the public and internal API contracts owned by
+This document defines the gRPC-first public and internal API contracts owned by
 `recommendation-service`.
 
 ## Document Contract
@@ -15,8 +15,8 @@ This document defines the public and internal API contracts owned by
 
 ### What MUST Be Documented Here
 
-- Public endpoints.
-- Internal endpoints.
+- Public gRPC services and RPCs.
+- Internal gRPC services and RPCs.
 - Auth/JWT expectations.
 - Request and response shapes.
 - Error/status responses.
@@ -35,12 +35,13 @@ This document defines the public and internal API contracts owned by
 1. Purpose
 2. API Principles
 3. Identity Rules
-4. Public Endpoints
-5. Internal Endpoints
-6. Error Model
-7. Idempotency
-8. Versioning
-9. Update Rules
+4. Operational Endpoints
+5. Public Endpoints
+6. Internal Endpoints
+7. Error Model
+8. Idempotency
+9. Versioning
+10. Update Rules
 
 ### Engineering Constraints
 
@@ -57,11 +58,14 @@ This document defines the public and internal API contracts owned by
 
 ## API Principles
 
-- Version public endpoints under `/v1`.
+- Version protobuf packages with `ontheblock.recommendation.v1`.
 - Keep response fields stable.
 - Add fields compatibly when possible.
 - Use explicit status values instead of ambiguous empty arrays.
 - Include request IDs for traceability.
+- Do not generate code from temporary proto drafts.
+- Use `chat.proto` as style reference until the real recommendation proto is
+  accepted.
 
 ## Identity Rules
 
@@ -73,15 +77,67 @@ JWT sub -> external_user_id
 
 `recommendation-service` MUST NOT issue, refresh, or own JWTs.
 
-## Public Endpoints
+## gRPC Services
 
-### `GET /v1/profile/status`
+The real `recommendation.proto` is not finalized yet. The intended service shape
+is:
+
+```proto
+service RecommendationService {
+  rpc GetProfileStatus(GetProfileStatusRequest) returns (GetProfileStatusResponse);
+  rpc GetBeverageRecommendations(GetBeverageRecommendationsRequest) returns (GetBeverageRecommendationsResponse);
+  rpc GetVenueRecommendations(GetVenueRecommendationsRequest) returns (GetVenueRecommendationsResponse);
+  rpc RecordRecommendationEvent(RecordRecommendationEventRequest) returns (RecordRecommendationEventResponse);
+}
+```
+
+Internal operations SHOULD be separated from public recommendation reads:
+
+```proto
+service RecommendationAdminService {
+  rpc SyncSurveyEvents(SyncSurveyEventsRequest) returns (SyncSurveyEventsResponse);
+  rpc RegenerateProfile(RegenerateProfileRequest) returns (RegenerateProfileResponse);
+  rpc RebuildProfiles(RebuildProfilesRequest) returns (RebuildProfilesResponse);
+  rpc RebuildQdrant(RebuildQdrantRequest) returns (RebuildQdrantResponse);
+  rpc GetSyncStatus(GetSyncStatusRequest) returns (GetSyncStatusResponse);
+}
+```
+
+## Operational Endpoints
+
+Operational HTTP endpoints expose service health and runtime status. They MUST
+NOT return user taste data, raw survey data, secrets, or recommendation results.
+
+The gRPC server also exposes the standard `grpc.health.v1.Health` service.
+
+### `GET /health/live`
+
+Purpose:
+
+- Process liveness check.
+
+### `GET /health/ready`
+
+Purpose:
+
+- Dependency readiness check for PostgreSQL and Qdrant.
+
+### `GET /v1/status`
+
+Purpose:
+
+- Return non-sensitive service configuration status such as active vector,
+  mapper, and scoring version names.
+
+## Public RPCs
+
+### `RecommendationService.GetProfileStatus`
 
 Purpose:
 
 - Return current recommendation profile lifecycle state.
 
-Response:
+Response shape:
 
 ```json
 {
@@ -92,13 +148,13 @@ Response:
 }
 ```
 
-### `GET /v1/recommendations/beverages`
+### `RecommendationService.GetBeverageRecommendations`
 
 Purpose:
 
 - Return explainable beverage recommendations for the authenticated user.
 
-Query parameters:
+Request fields:
 
 | Name | Required | Meaning |
 |---|---|---|
@@ -129,13 +185,13 @@ Response:
 }
 ```
 
-### `GET /v1/recommendations/venues`
+### `RecommendationService.GetVenueRecommendations`
 
 Purpose:
 
 - Return explainable venue recommendations for the authenticated user.
 
-Query parameters:
+Request fields:
 
 | Name | Required | Meaning |
 |---|---|---|
@@ -144,7 +200,7 @@ Query parameters:
 | `radius_m` | no | Search radius in meters |
 | `limit` | no | Result count |
 
-### `POST /v1/recommendation-events`
+### `RecommendationService.RecordRecommendationEvent`
 
 Purpose:
 
@@ -171,19 +227,19 @@ dismiss
 detail_view
 ```
 
-## Internal Endpoints
+## Internal RPCs
 
-Internal endpoints are for workers, admin tools, or controlled service calls.
+Internal RPCs are for workers, admin tools, or controlled service calls.
 
 ```text
-POST /internal/v1/sync/survey-events
-POST /internal/v1/profiles/{external_user_id}/regenerate
-POST /internal/v1/rebuild/profiles
-POST /internal/v1/rebuild/qdrant
-GET  /internal/v1/sync/status
+RecommendationAdminService.SyncSurveyEvents
+RecommendationAdminService.RegenerateProfile
+RecommendationAdminService.RebuildProfiles
+RecommendationAdminService.RebuildQdrant
+RecommendationAdminService.GetSyncStatus
 ```
 
-Internal endpoints MUST NOT be exposed through the public gateway without
+Internal RPCs MUST NOT be exposed through the public gateway without
 authorization controls.
 
 ## Error Model
@@ -214,4 +270,3 @@ Required profile-state errors:
 Interaction events SHOULD accept an idempotency key when clients can retry.
 Internal profile regeneration MUST be idempotent by profile generation uniqueness
 rules documented in `../recommendation/sync-flow.md`.
-

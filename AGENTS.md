@@ -59,6 +59,8 @@ Domain document map:
 - MUST NOT access the `survey-service` database directly.
 - MUST NOT store raw survey answers as canonical state.
 - MUST communicate with `survey-service` through APIs/events only.
+- MUST use gRPC for MSA service-to-service contracts unless a document states
+  why HTTP is being used for a specific operational path.
 - MUST treat PostgreSQL as canonical for recommendation-owned state.
 - MUST treat Qdrant as rebuildable and disposable.
 - MUST NOT rely on Qdrant as the only vector store.
@@ -138,7 +140,8 @@ Do not duplicate domain rules in root files. Link to the owning doc.
 
 - MUST keep `.env.example` free of secrets.
 - MUST document every required environment variable in `.env.example`.
-- MUST use service API URLs for cross-service communication.
+- MUST use gRPC service addresses for MSA service-to-service communication.
+- MAY keep HTTP URLs for health, local debugging, or JWKS-style auth metadata.
 - MUST NOT configure direct access to `auth-service` or `survey-service`
   databases.
 - SHOULD keep local defaults compatible with Docker Compose.
@@ -168,4 +171,3 @@ Before finishing a change:
 - Are retries and failure states idempotent?
 - Do docs need to be updated?
 - Do tests or migration checks need to be added?
-

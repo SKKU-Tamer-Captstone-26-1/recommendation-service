@@ -59,13 +59,13 @@ databases or distributed transactions.
 
 ## Sync Strategy
 
-MVP SHOULD use pull-based sync:
+MVP SHOULD use pull-based sync over gRPC:
 
 ```text
 survey-service durable event source
   -> recommendation-service polling worker
-      -> fetch event by cursor
-      -> fetch canonical survey response
+      -> fetch events by cursor through SurveyService RPC
+      -> fetch canonical survey response through SurveyService RPC
       -> generate profile revision
       -> store vector in PostgreSQL
       -> index Qdrant
@@ -73,6 +73,7 @@ survey-service durable event source
 ```
 
 This can later move to a message broker without changing event semantics.
+`recommendation-service` MUST NOT use direct survey database access.
 
 ## Event Contract
 
@@ -147,10 +148,10 @@ sequenceDiagram
     participant PG as PostgreSQL
     participant Q as Qdrant
 
-    Worker->>Survey: GET events after cursor
+    Worker->>Survey: SurveyService.ListSurveyEvents(cursor)
     Survey-->>Worker: survey event
     Worker->>PG: Insert survey_sync_event
-    Worker->>Survey: GET survey response
+    Worker->>Survey: SurveyService.GetSurveyResponse(response_id)
     Survey-->>Worker: canonical response
     Worker->>PG: Insert profile revision + vector
     Worker->>Q: Upsert vector point
@@ -195,4 +196,3 @@ Failures MUST persist:
 
 Qdrant rebuild MUST start from PostgreSQL vectors, not from survey-service
 directly.
-
