@@ -15,9 +15,10 @@
 
 AI-first backend service for On the Block recommendations.
 
-This repository owns derived recommendation state only. It generates taste
-profiles, recommendation vectors, scoring metadata, explanations, and
-recommendation logs from survey data owned by `survey-service`.
+This repository owns derived recommendation state and the curated MVP beverage
+catalog until a separate catalog-service exists. It generates taste profiles,
+recommendation vectors, scoring metadata, explanations, and recommendation logs
+from survey data owned by `survey-service`.
 
 The platform is MSA-based and uses gRPC for service-to-service communication.
 FastAPI remains in this repository for operational health/status endpoints and
@@ -50,7 +51,7 @@ It MUST NOT document:
 | `auth-service` | Authentication, Google OAuth, JWT issuing, user identity |
 | `survey-service` | Raw survey answers, survey schema, survey response revisions |
 | `map-service` / `place-service` | Canonical place, menu, inventory, price, and location data |
-| `recommendation-service` | Derived taste profiles, vectors, scoring metadata, explanations, recommendation logs |
+| `recommendation-service` | Derived taste profiles, curated MVP beverage catalog, vectors, scoring metadata, explanations, recommendation logs |
 | `assistant-service` | Future grounded conversational orchestration; not recommendation ranking |
 
 Non-negotiable rules:
@@ -104,6 +105,7 @@ Root-level files are repository contracts:
 
 - implementation readiness gates
 - service architecture
+- beverage catalog foundation
 - recommendation logic
 - assistant design contracts
 - map/place ownership and read-model rules
@@ -193,6 +195,24 @@ Rules:
 - gRPC addresses SHOULD be used for MSA service-to-service calls.
 - JWT configuration MUST verify tokens issued by `auth-service`; this service
   MUST NOT issue JWTs.
+
+Current deployed `auth-service` URL:
+
+```text
+https://authorization-service-44649239380.asia-northeast3.run.app
+```
+
+Use the deployed service through environment overrides, not application code
+defaults:
+
+```bash
+AUTH_SERVICE_URL=https://authorization-service-44649239380.asia-northeast3.run.app
+AUTH_JWKS_URL=https://authorization-service-44649239380.asia-northeast3.run.app/.well-known/jwks.json
+AUTH_SERVICE_GRPC_ADDR=authorization-service-44649239380.asia-northeast3.run.app:443
+```
+
+Before production JWT verification depends on this endpoint, confirm the exact
+JWKS path and whether the deployed gRPC endpoint is exposed over TLS on `:443`.
 
 ## Repository Conventions
 

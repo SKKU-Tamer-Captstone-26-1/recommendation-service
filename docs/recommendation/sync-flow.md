@@ -68,7 +68,7 @@ survey-service durable event source
       -> fetch canonical survey response through SurveyService RPC
       -> generate profile revision
       -> store vector in PostgreSQL
-      -> index Qdrant
+      -> mark Qdrant indexing pending or index Qdrant when indexing is enabled
       -> mark event processed
 ```
 
@@ -162,8 +162,8 @@ sequenceDiagram
     Worker->>PG: Insert survey_sync_event
     Worker->>Survey: SurveyService.GetSurveyResponse(response_id)
     Survey-->>Worker: canonical response
-    Worker->>PG: Insert profile revision + vector
-    Worker->>Q: Upsert vector point
+    Worker->>PG: Insert profile revision + canonical vector
+    Worker->>Q: Upsert vector point when indexing is enabled
     Worker->>PG: Mark event processed and advance cursor
 ```
 

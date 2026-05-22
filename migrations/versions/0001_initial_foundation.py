@@ -30,6 +30,153 @@ def _uuid_pk() -> sa.Column:
     return sa.Column("id", postgresql.UUID(as_uuid=True), server_default=sa.text("gen_random_uuid()"), nullable=False)
 
 
+def _seed_foundation_versions() -> None:
+    op.execute(
+        """
+        INSERT INTO vector_schema_versions (
+            name,
+            version,
+            dimensions_json,
+            dimension_count,
+            distance_metric,
+            status,
+            description
+        )
+        VALUES (
+            'taste',
+            'taste_v1',
+            $${
+              "schema_name": "taste_v1",
+              "value_range": {"min": 0.0, "max": 1.0},
+              "dimensions": [
+                {"index": 0, "name": "sweet", "meaning": "Sweetness, dessert-like notes, sugar impression"},
+                {"index": 1, "name": "fruity", "meaning": "Fresh fruit, citrus, berry, tropical fruit"},
+                {"index": 2, "name": "dried_fruit", "meaning": "Raisin, fig, date, jam, dark fruit"},
+                {"index": 3, "name": "woody", "meaning": "Oak, barrel, cedar, wood spice"},
+                {"index": 4, "name": "smoky", "meaning": "Smoke, peat, char, roasted smoke"},
+                {"index": 5, "name": "nutty", "meaning": "Almond, hazelnut, walnut, grain nuttiness"},
+                {"index": 6, "name": "floral", "meaning": "Flowers, perfume, delicate aromatics"},
+                {"index": 7, "name": "spicy", "meaning": "Baking spice, pepper, warm spice"},
+                {"index": 8, "name": "herbal", "meaning": "Mint, herbs, botanical notes"},
+                {"index": 9, "name": "body", "meaning": "Weight, richness, mouthfeel"},
+                {"index": 10, "name": "acidity", "meaning": "Tartness, sourness, brightness"},
+                {"index": 11, "name": "carbonation", "meaning": "Sparkle, fizz, effervescence"},
+                {"index": 12, "name": "alcohol_intensity", "meaning": "Heat, spirit-forward strength"},
+                {"index": 13, "name": "bitterness", "meaning": "Hop bitterness, bitter finish"},
+                {"index": 14, "name": "tannin", "meaning": "Drying grip, wine structure"},
+                {"index": 15, "name": "roasted", "meaning": "Coffee, cocoa, toast, roasted malt"}
+              ]
+            }$$::jsonb,
+            16,
+            'cosine',
+            'active',
+            'Explainable taste vector schema documented as taste_v1.'
+        )
+        ON CONFLICT ON CONSTRAINT uq_vector_schema_name_version DO NOTHING
+        """
+    )
+
+    op.execute(
+        """
+        INSERT INTO mapper_versions (
+            name,
+            version,
+            compatible_vector_schema,
+            code_hash,
+            rules_json,
+            status,
+            description
+        )
+        VALUES (
+            'survey_mapper',
+            'survey_mapper_v1',
+            'taste_v1',
+            NULL,
+            $${
+              "source_doc": "docs/recommendation/survey-mapping.md",
+              "vector_schema": "taste_v1",
+              "input_contract": "survey_v1",
+              "snapshot_policy": "redacted_generation_evidence_only"
+            }$$::jsonb,
+            'active',
+            'Initial documented survey-to-profile mapper contract.'
+        )
+        ON CONFLICT ON CONSTRAINT uq_mapper_name_version DO NOTHING
+        """
+    )
+
+    op.execute(
+        """
+        INSERT INTO scoring_configs (
+            name,
+            version,
+            target_type,
+            category,
+            weights_json,
+            reason_code_rules_json,
+            status,
+            description
+        )
+        VALUES
+        (
+            'default_scoring',
+            'scoring_v1',
+            'beverage',
+            'all',
+            $${
+              "taste_similarity_weighted": 0.65,
+              "budget_fit": 0.10,
+              "category_fit": 0.10,
+              "experience_fit": 0.05,
+              "popularity_or_quality": 0.05,
+              "diversity_adjustment": 0.05
+            }$$::jsonb,
+            $${
+              "template_version": "reason_template_v1",
+              "source_doc": "docs/recommendation/recommendation-logic.md",
+              "reason_codes": [
+                "MATCHES_VANILLA_CARAMEL",
+                "MATCHES_SMOKY_PROFILE",
+                "BEGINNER_FRIENDLY",
+                "WITHIN_BUDGET",
+                "ADJACENT_DISCOVERY"
+              ]
+            }$$::jsonb,
+            'active',
+            'Initial beverage scoring metadata. Not an algorithm implementation.'
+        ),
+        (
+            'default_scoring',
+            'scoring_v1',
+            'venue',
+            'all',
+            $${
+              "taste_similarity_weighted": 0.35,
+              "distance_fit": 0.20,
+              "budget_fit": 0.10,
+              "availability_confidence": 0.15,
+              "price_confidence": 0.10,
+              "freshness_adjustment": 0.10
+            }$$::jsonb,
+            $${
+              "template_version": "reason_template_v1",
+              "source_doc": "docs/recommendation/map-read-model.md",
+              "reason_codes": [
+                "NEARBY_VENUE",
+                "WITHIN_BUDGET",
+                "LIKELY_AVAILABLE",
+                "FRESH_INVENTORY",
+                "BALANCED_BEST"
+              ]
+            }$$::jsonb,
+            'active',
+            'Initial venue scoring metadata. Not an algorithm implementation.'
+        )
+        ON CONFLICT ON CONSTRAINT uq_scoring_config_identity DO NOTHING
+        """
+    )
+
+
 def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
     op.execute("CREATE EXTENSION IF NOT EXISTS postgis")
@@ -80,6 +227,8 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("name", "version", "target_type", "category", name="uq_scoring_config_identity"),
     )
+
+    _seed_foundation_versions()
 
     op.create_table(
         "user_profile_state",

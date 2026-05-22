@@ -71,11 +71,13 @@ Includes:
 
 ## Recommendation Service
 
-Owns recommendation-specific derived state.
+Owns recommendation-specific derived and catalog state.
 
 Includes:
 
 - taste profile
+- curated MVP beverage catalog and beverage flavor profiles until a separate
+  catalog-service exists
 - recommendation vectors
 - scoring configs
 - recommendation logs

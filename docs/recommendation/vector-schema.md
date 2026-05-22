@@ -134,6 +134,40 @@ Each vector owner SHOULD have confidence metadata:
 Low confidence means the value may be missing or weakly inferred. It does not
 mean the user dislikes the trait.
 
+## Beverage Vector Contract
+
+Beverage vectors are canonical recommendation-owned vectors stored in
+PostgreSQL before any Qdrant indexing.
+
+Required storage:
+
+```text
+beverage_items
+  -> flavor_profiles(owner_type = beverage_item)
+  -> recommendation_vectors(owner_type = beverage_item, vector_schema = taste_v1)
+  -> qdrant_points only after indexing is implemented
+```
+
+Rules:
+
+- Each active MVP beverage SHOULD have one current `taste_v1` vector.
+- `recommendation_vectors.vector` MUST follow the exact `taste_v1` dimension
+  order.
+- `recommendation_vectors.vector_json` MUST preserve named dimensions for
+  debugging and explanation.
+- `recommendation_vectors.confidence_json` MUST preserve confidence by
+  dimension.
+- `source_hash` MUST change when curated beverage flavor metadata changes.
+- Inactive beverage items MUST be excluded from candidate generation even if
+  their vectors remain stored for audit or future reactivation.
+- Qdrant beverage points MUST be rebuilt from PostgreSQL vectors and MUST NOT be
+  treated as canonical beverage vector storage.
+
+Reason-code hints may be stored with beverage curation metadata, but final
+reason-code emission belongs to versioned scoring rules.
+
+Beverage catalog details are documented in `beverage-catalog.md`.
+
 ## Category Strategy
 
 `taste_v1` is shared across categories. Category-specific behavior belongs in:

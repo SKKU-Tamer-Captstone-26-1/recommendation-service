@@ -82,7 +82,7 @@ Service ownership:
 | `survey-service` | Survey schemas, raw answers, answer revisions | Taste vectors, recommendations |
 | `map-service` / `place-service` | Canonical places, menus, inventory, prices, location data | Recommendation scoring, taste profiles |
 | `assistant-service` | App-domain conversational orchestration and grounded natural-language answers | Auth, raw survey truth, recommendation ranking, canonical place data |
-| `recommendation-service` | Derived taste profiles, vectors, scoring metadata, recommendation logs | Auth, raw survey truth |
+| `recommendation-service` | Derived taste profiles, curated MVP beverage catalog, vectors, scoring metadata, recommendation logs | Auth, raw survey truth, canonical venue/menu/inventory/price truth |
 
 Assistant architecture is documented in `assistant/assistant-architecture.md`.
 The assistant MUST call `recommendation-service` for deterministic
@@ -104,6 +104,8 @@ PostgreSQL
   - mapper versions
   - recommendation vectors
   - scoring configs
+  - curated MVP beverage catalog
+  - beverage flavor profiles
   - recommendation logs
   - Qdrant indexing metadata
   - sync cursors and failure state
@@ -117,6 +119,9 @@ Qdrant
 
 Qdrant MUST NOT contain the only copy of any state required for rebuild,
 explanation, or audit.
+
+Real beverage indexing in Qdrant SHOULD wait until PostgreSQL contains active
+beverage catalog rows, curated flavor profiles, and canonical beverage vectors.
 
 Map/place data inside `recommendation-service` is snapshot/read-model state only.
 It must be rebuildable from map-service/place-service APIs, events, or snapshots.

@@ -2,6 +2,13 @@ from fastapi.testclient import TestClient
 
 from app.core.config import Settings
 from app.db.base import Base
+from app.domain.foundation_versions import (
+    SCORING_V1,
+    SURVEY_MAPPER_V1,
+    scoring_v1_payloads,
+    survey_mapper_v1_payload,
+    taste_v1_vector_schema_payload,
+)
 from app.domain.vector_schema import TASTE_V1_DIMENSION_COUNT, TASTE_V1_DIMENSIONS
 from app.grpc.server import create_grpc_server
 from app.main import app
@@ -59,6 +66,24 @@ def test_taste_v1_dimension_order_is_stable() -> None:
     assert TASTE_V1_DIMENSION_COUNT == 16
     assert dimension_names[0] == "sweet"
     assert dimension_names[15] == "roasted"
+
+
+def test_foundation_version_payloads_match_active_settings() -> None:
+    vector_payload = taste_v1_vector_schema_payload()
+    mapper_payload = survey_mapper_v1_payload()
+    scoring_payloads = scoring_v1_payloads()
+
+    assert vector_payload["version"] == "taste_v1"
+    assert vector_payload["dimension_count"] == 16
+    assert vector_payload["status"] == "active"
+    assert mapper_payload["version"] == SURVEY_MAPPER_V1
+    assert mapper_payload["compatible_vector_schema"] == "taste_v1"
+    assert {payload["target_type"] for payload in scoring_payloads} == {
+        "beverage",
+        "venue",
+    }
+    assert all(payload["version"] == SCORING_V1 for payload in scoring_payloads)
+    assert all(payload["status"] == "active" for payload in scoring_payloads)
 
 
 def test_grpc_health_server_can_be_created() -> None:

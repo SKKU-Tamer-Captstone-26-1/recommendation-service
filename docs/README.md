@@ -71,7 +71,8 @@ These rules are non-negotiable for implementation:
 
 - `auth-service` owns authentication, Google OAuth, JWT issuing, and user identity.
 - `survey-service` owns raw survey answers and survey schema.
-- `recommendation-service` owns derived recommendation state only.
+- `recommendation-service` owns derived recommendation state and the curated MVP
+  beverage catalog until a separate catalog-service exists.
 - PostgreSQL is the canonical source of truth for recommendation-owned state.
 - Qdrant is a rebuildable derived vector index.
 - Eventual consistency is accepted.
@@ -117,6 +118,7 @@ Domain docs live here:
 
 - architecture
 - map/place ownership and conceptual database model
+- beverage catalog foundation
 - recommendation logic
 - recommendation map read model
 - assistant architecture, RAG policy, prompt contract, response schema, and
@@ -142,6 +144,7 @@ Domain docs live here:
 | Architecture and ownership | `architecture.md` |
 | Map/place ownership | `map-place/ownership.md` |
 | Map/place conceptual database | `map-place/database.md` |
+| Beverage catalog foundation | `recommendation/beverage-catalog.md` |
 | Recommendation pipeline | `recommendation/recommendation-logic.md` |
 | Recommendation map read model | `recommendation/map-read-model.md` |
 | Assistant architecture | `assistant/assistant-architecture.md` |
@@ -171,11 +174,12 @@ For a new human or AI contributor:
 7. `recommendation/sync-flow.md`
 8. `database/erd.md`
 9. `recommendation/vector-schema.md`
-10. `recommendation/survey-mapping.md`
-11. `recommendation/recommendation-logic.md`
-12. `api/recommendation-api.md`
-13. `database/migration-strategy.md`
-14. `decisions/adr-001-derived-state.md`
+10. `recommendation/beverage-catalog.md`
+11. `recommendation/survey-mapping.md`
+12. `recommendation/recommendation-logic.md`
+13. `api/recommendation-api.md`
+14. `database/migration-strategy.md`
+15. `decisions/adr-001-derived-state.md`
 
 For map/place work, also read:
 
@@ -187,6 +191,13 @@ For recommendation work involving places, also read:
 
 1. `recommendation/map-read-model.md`
 2. `map-place/ownership.md`
+
+For beverage catalog or beverage vector work, also read:
+
+1. `recommendation/beverage-catalog.md`
+2. `recommendation/vector-schema.md`
+3. `database/erd.md`
+4. `database/migration-strategy.md`
 
 For assistant/chatbot work, also read:
 
@@ -215,6 +226,7 @@ docs/
   - ownership.md
   - database.md
 - recommendation/
+  - beverage-catalog.md
   - map-read-model.md
   - recommendation-logic.md
   - vector-schema.md

@@ -157,6 +157,8 @@ or map-service ingestion workers.
 `recommendation-service` owns:
 
 - user taste profiles derived from survey data
+- curated MVP beverage catalog records and beverage flavor profiles until a
+  separate catalog-service exists
 - recommendation vectors
 - vector schema versions
 - mapper versions
@@ -175,6 +177,7 @@ or map-service ingestion workers.
 - decide whether a place exists canonically
 - directly mutate menu, inventory, or price data
 - rely on Qdrant as the only vector store
+- treat Qdrant as canonical beverage catalog or vector storage
 
 It may consume published map-service data through:
 

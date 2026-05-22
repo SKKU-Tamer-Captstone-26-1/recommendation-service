@@ -47,6 +47,10 @@ and explanation behavior.
 
 - Recommendations MUST be reproducible from profile revision, vector schema,
   mapper version, scoring config, catalog state, and request filters.
+- Beverage recommendation work MUST start from PostgreSQL catalog rows and
+  canonical beverage vectors.
+- Qdrant MUST NOT be used for real beverage candidate retrieval until
+  PostgreSQL contains validated beverage vectors.
 - V1 explanations MUST be deterministic templates and reason codes.
 - Random ranking behavior MUST NOT be introduced without a stored seed and config.
 - Scoring config changes MUST be versioned.
@@ -63,31 +67,46 @@ and explanation behavior.
 1. Resolve authenticated external_user_id.
 2. Load active taste_profile_revision.
 3. Apply request-level constraints.
-4. Retrieve broad candidates from Qdrant.
-5. Hydrate candidates from PostgreSQL.
-6. Apply hard filters.
-7. Rerank with versioned scoring config.
-8. Apply diversity/exploration rules.
-9. Generate deterministic explanations.
-10. Persist recommendation request, results, explanations, and interactions.
+4. Load eligible catalog candidates and canonical vectors from PostgreSQL.
+5. Optionally retrieve broad candidates from Qdrant after indexing exists.
+6. Hydrate or confirm candidates from PostgreSQL.
+7. Apply hard filters.
+8. Rerank with versioned scoring config.
+9. Apply diversity/exploration rules.
+10. Generate deterministic explanations.
+11. Persist recommendation request, results, explanations, and interactions.
 ```
 
 ## Candidate Generation
+
+MVP candidate generation is PostgreSQL-first.
 
 Candidate sources:
 
 | Target Type | Source |
 |---|---|
-| Beverage | `beverage_items` + beverage vector collection |
+| Beverage | `beverage_items` + `flavor_profiles` + `recommendation_vectors` |
 | Venue | `venue_snapshots`, `venue_inventory_snapshots`, `venue_price_snapshots`, venue vector collection |
 | Menu item | `venue_menu_snapshots` + menu item vector collection |
 
-Qdrant SHOULD retrieve more candidates than the API limit so reranking can apply
-metadata and diversity rules.
+Qdrant SHOULD retrieve more candidates than the API limit only after the
+PostgreSQL catalog foundation exists and has been indexed from canonical
+PostgreSQL vectors.
+
+For the beverage MVP, the blocker is not Qdrant. The blocker is a curated
+catalog with:
+
+- active `beverage_items`
+- `flavor_profiles` for each active beverage
+- canonical `recommendation_vectors` with `owner_type = beverage_item`
+- reason-code hints and source metadata
+- seed/import tests proving rebuildability
 
 Venue and menu-item sources are read-model snapshots from
 map-service/place-service. They are not canonical place/menu/inventory/price
 tables.
+
+Beverage catalog rules are documented in `beverage-catalog.md`.
 
 ## Hard Filters
 

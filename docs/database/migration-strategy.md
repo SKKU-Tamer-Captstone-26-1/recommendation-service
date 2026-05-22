@@ -94,6 +94,51 @@ Backfills SHOULD:
 - log counts and failures
 - avoid holding long locks
 
+## Beverage Catalog Migration Rules
+
+The beverage catalog foundation should be PostgreSQL-first.
+
+Current foundation tables are sufficient to begin MVP catalog work:
+
+- `beverage_items`
+- `flavor_profiles`
+- `recommendation_vectors`
+- `vector_schema_versions`
+- `scoring_configs`
+- `qdrant_points`
+
+If the initial migration has not been deployed outside local development, keep
+the catalog foundation in the initial migration and add seed/import code
+separately.
+
+If the initial migration has already been applied, do not rewrite it. Use
+additive migrations only.
+
+Seed data rules:
+
+- Store 10-20 MVP beverage seed records in a versioned JSON file.
+- Use deterministic UUIDs.
+- Store `catalog_key` in `metadata_json` unless a future migration promotes it
+  to a real column.
+- Import idempotently into `beverage_items`, `flavor_profiles`, and
+  `recommendation_vectors`.
+- Validate every seed vector against `taste_v1` before writing.
+- Do not create Qdrant points as part of initial catalog seed unless the indexing
+  worker is explicitly implemented.
+
+Optional future migration:
+
+```text
+0002_add_beverage_catalog_key
+- add beverage_items.catalog_key nullable
+- backfill from metadata_json.catalog_key
+- add a unique index
+- set NOT NULL after validation
+```
+
+Do not add this migration until catalog admin/search workflows need a database
+level natural key.
+
 ## Vector and Mapper Migration Rules
 
 Create a new vector schema version for:

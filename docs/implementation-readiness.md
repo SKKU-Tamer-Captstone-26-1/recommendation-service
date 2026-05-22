@@ -9,7 +9,7 @@ contributors do not start coding from an ambiguous contract.
 
 ## Current Status
 
-The repository is in pre-implementation contract mode.
+The repository is in foundation implementation mode.
 
 Docs are the source of truth for:
 
@@ -23,6 +23,9 @@ Docs are the source of truth for:
 
 Implementation MUST follow these docs. If code and docs conflict, stop and fix
 the docs or code before continuing.
+
+Recommendation algorithms, real Qdrant indexing, assistant runtime, and
+survey-service sync workers are not implemented yet.
 
 ## Repository Implementation Scope
 
@@ -130,6 +133,7 @@ Expected checks by area:
 |---|---|
 | config/app startup | import/startup tests, health checks |
 | database | migration upgrade/downgrade or dry-run |
+| beverage catalog | seed validation, idempotency tests, vector length checks |
 | sync | idempotency tests, retry/dead-letter tests |
 | vector/Qdrant | rebuild/indexing tests |
 | recommendation | deterministic ranking and explanation tests |
@@ -143,14 +147,18 @@ Recommended order:
 2. FastAPI health/status endpoints and gRPC server skeleton.
 3. PostgreSQL connection, SQLAlchemy base, and Alembic.
 4. Version registries: vector schema, mapper, scoring config.
-5. Profile state, profile revisions, survey source snapshots, vectors.
-6. Sync cursors, sync events, retry, and dead-letter tables.
-7. Qdrant collection metadata and indexing client.
-8. Survey-service client interface and pull-sync worker.
-9. Beverage recommendation API and deterministic explanation templates.
-10. Map/place snapshot read model and venue recommendation API.
-11. Rebuild and recovery commands.
-12. Assistant runtime only after a separate implementation decision.
+5. Beverage catalog foundation: catalog rows, flavor profiles, canonical
+   PostgreSQL beverage vectors, and 10-20 idempotent seed records.
+6. Profile state, profile revisions, survey source snapshots, and user vectors.
+7. Sync cursors, sync events, retry, and dead-letter tables.
+8. Qdrant health/metadata wrapper only after PostgreSQL has canonical beverage
+   vectors; defer real indexing workers until then.
+9. Survey-service client interface and pull-sync worker after the survey-service
+   contract is deployed.
+10. Beverage recommendation API and deterministic explanation templates.
+11. Map/place snapshot read model and venue recommendation API.
+12. Rebuild and recovery commands.
+13. Assistant runtime only after a separate implementation decision.
 
 ## Decisions Required Before Coding Certain Areas
 
@@ -159,7 +167,7 @@ Recommended order:
 | Protobuf | Final location and package for `recommendation.proto` |
 | Identity | Exact gateway/auth metadata passed to gRPC handlers |
 | Survey sync | SurveyService event/list/get response contract |
-| Beverage catalog | Whether catalog remains in recommendation-service or moves later |
+| Beverage catalog | Initial seed source, deterministic IDs, and whether `catalog_key` stays in metadata or becomes a column |
 | Map snapshots | Map-service event/snapshot contract and freshness fields |
 | Assistant | Separate service vs module, provider strategy, prompt storage |
 | Kakao | Legal/partnership policy before storing Kakao response data |
@@ -171,6 +179,8 @@ Do not implement these until explicit approval:
 - LLM-based assistant runtime
 - RAG storage or vectorization
 - fine-tuning or warm-up learning
+- recommendation ranking logic before the beverage catalog foundation exists
+- real Qdrant indexing before canonical PostgreSQL beverage vectors exist
 - canonical map/place database
 - canonical inventory/price writes
 - direct survey database reads

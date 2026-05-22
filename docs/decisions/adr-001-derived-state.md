@@ -72,12 +72,15 @@ be reproducible and rebuildable.
 
 ## Decision
 
-`recommendation-service` owns derived recommendation state only.
+`recommendation-service` owns derived recommendation state and the curated MVP
+beverage catalog until a separate catalog-service exists.
 
 It owns:
 
 - derived taste profiles
 - profile revisions
+- curated MVP beverage catalog records and beverage flavor profiles until a
+  separate catalog-service exists
 - recommendation vectors
 - vector schema versions
 - mapper versions
@@ -100,6 +103,8 @@ It does not own:
 
 - PostgreSQL is canonical for recommendation-owned state.
 - Qdrant is a rebuildable derived vector index.
+- MVP beverage catalog records are recommendation-owned catalog state, but venue
+  menus, inventory, and prices remain owned by map-service/place-service.
 - Survey data is obtained through service APIs/events, not shared databases.
 - Profile generation is eventually consistent.
 - Distributed transactions and 2PC are forbidden.
@@ -134,6 +139,7 @@ with retries is the required pattern.
 
 - `docs/architecture.md`
 - `docs/implementation-readiness.md`
+- `docs/recommendation/beverage-catalog.md`
 - `docs/recommendation/sync-flow.md`
 - `docs/recommendation/map-read-model.md`
 - `docs/recommendation/survey-mapping.md`
