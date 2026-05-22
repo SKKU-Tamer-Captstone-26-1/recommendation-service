@@ -7,6 +7,9 @@ implementation changes are promoted.
 
 The goal is to prevent overconfident, ungrounded, or out-of-scope answers.
 
+This policy is required before assistant implementation. MVP assistant code must
+ship with grounding, refusal, and no-answer evaluations.
+
 ## Evaluation Principles
 
 - Evaluation MUST test refusal behavior, not only helpful answers.

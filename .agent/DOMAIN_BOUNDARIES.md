@@ -84,9 +84,15 @@ Includes:
 
 It must not directly mutate place/menu/inventory/price data.
 
+Map/place snapshots are derived read models and must be rebuildable from
+map-service/place-service.
+
 ## Chatbot / RAG
 
 The ONTHEBLOCK assistant is an orchestration layer, not a canonical data owner.
+
+Assistant runtime ownership is not approved for implementation until the
+implementation-readiness assistant gate is satisfied.
 
 It may use RAG to build grounded context and produce natural-language answers.
 

@@ -7,6 +7,9 @@ This document defines the required prompt behavior for the ONTHEBLOCK assistant.
 It is provider-neutral. It MUST NOT include real LLM credentials, deployment
 secrets, or provider-specific implementation code.
 
+This is a pre-implementation contract. Prompt text, prompt storage, and provider
+integration must be finalized before production assistant runtime begins.
+
 ## Prompt Objective
 
 The assistant prompt must force the model to:

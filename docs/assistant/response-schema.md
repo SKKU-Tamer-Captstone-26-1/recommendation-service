@@ -8,6 +8,9 @@ assistant.
 This is not a finalized protobuf contract. Do not generate code from this
 document until the project accepts an assistant proto workflow.
 
+This schema is a pre-implementation draft. It defines expected behavior and
+review targets, not generated API code.
+
 ## API Principles
 
 - gRPC is the default MSA service-to-service contract.

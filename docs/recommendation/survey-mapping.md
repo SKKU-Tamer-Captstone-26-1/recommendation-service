@@ -48,6 +48,8 @@ mapped into derived taste profiles owned by `recommendation-service`.
 - Mapper changes MUST create a new mapper version.
 - Generated profiles MUST record survey version, response revision, mapper
   version, and vector schema version.
+- Survey snapshots stored by recommendation-service are generation evidence, not
+  raw survey ownership.
 
 ### Update Rules
 
@@ -65,7 +67,7 @@ Allowed:
 - `survey_version`
 - `survey_response_revision`
 - source snapshot hash
-- optional generation snapshot JSON for audit/debug
+- optional redacted generation snapshot JSON for audit/debug
 - derived taste profile
 
 Forbidden:
@@ -73,6 +75,7 @@ Forbidden:
 - treating raw survey answers as canonical
 - editing survey answers
 - direct survey database access
+- using stored snapshots as the rebuild source when survey-service is available
 
 ## Current Mapper Version: `survey_mapper_v1`
 
@@ -160,10 +163,14 @@ For each generated profile, store:
 - source snapshot hash
 - mapper version
 - vector schema version
-- optional snapshot JSON used for generation
+- optional redacted snapshot JSON used for generation
 
 Rebuilds SHOULD fetch fresh canonical data from `survey-service`. Stored
 snapshots are for audit and forensic comparison, not source ownership.
+
+If a snapshot is stored, it SHOULD contain only fields required to reproduce the
+mapper input and debug the generated profile. It MUST NOT become the canonical
+survey record.
 
 ## Versioning Rules
 
@@ -174,4 +181,3 @@ Create a new mapper version when:
 - keyword-to-dimension mapping changes
 - profile output logic changes
 - vector schema compatibility changes
-

@@ -133,8 +133,9 @@ with retries is the required pattern.
 ## Impacted Docs
 
 - `docs/architecture.md`
+- `docs/implementation-readiness.md`
 - `docs/recommendation/sync-flow.md`
+- `docs/recommendation/map-read-model.md`
 - `docs/recommendation/survey-mapping.md`
 - `docs/database/erd.md`
 - `docs/database/migration-strategy.md`
-

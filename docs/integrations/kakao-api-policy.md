@@ -5,6 +5,9 @@
 Kakao Local/Map API must not be treated as canonical bulk-ingestion source
 unless legal or partnership approval explicitly allows it.
 
+Before implementation, any feature that stores Kakao-derived data MUST document
+the storage policy, retention period, source metadata, and approval source.
+
 ## Allowed By Default
 
 ```text
@@ -30,6 +33,8 @@ If Kakao-derived data is referenced, track policy metadata.
 ```text
 source_type = KAKAO
 source_policy = realtime_only | restricted | storable
+source_observed_at = timestamp
+source_expires_at = timestamp when applicable
 ```
 
 ## Preferred Canonical Sources
@@ -67,4 +72,3 @@ Phase 3:
 - walking distance
 - route complexity scoring
 ```
-

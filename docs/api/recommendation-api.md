@@ -66,6 +66,8 @@ This document defines the gRPC-first public and internal API contracts owned by
 - Do not generate code from temporary proto drafts.
 - Use `chat.proto` as style reference until the real recommendation proto is
   accepted.
+- Before implementation, confirm the final proto path, package, and generated
+  code location.
 
 ## Identity Rules
 
@@ -76,6 +78,8 @@ JWT sub -> external_user_id
 ```
 
 `recommendation-service` MUST NOT issue, refresh, or own JWTs.
+
+Public RPC requests MUST NOT contain `user_id` or `external_user_id` fields.
 
 ## gRPC Services
 
@@ -90,6 +94,11 @@ service RecommendationService {
   rpc RecordRecommendationEvent(RecordRecommendationEventRequest) returns (RecordRecommendationEventResponse);
 }
 ```
+
+Assistant API drafts are documented separately in
+`../assistant/response-schema.md`. Do not merge assistant RPCs into
+`RecommendationService` unless a future architecture decision explicitly places
+assistant runtime inside this repository.
 
 Internal operations SHOULD be separated from public recommendation reads:
 
@@ -199,6 +208,43 @@ Request fields:
 | `lng` | yes | Longitude |
 | `radius_m` | no | Search radius in meters |
 | `limit` | no | Result count |
+| `selected_beverage_id` | no | Beverage the user wants to buy or drink |
+| `budget_mode` | no | `strict` or `soft` |
+
+Response:
+
+```json
+{
+  "request_id": "rec_req_venue_123",
+  "profile_revision": 4,
+  "results": [
+    {
+      "rank": 1,
+      "target_type": "venue",
+      "target_id": "place_123",
+      "name": "Example Bottle Shop",
+      "option_type": "balanced_best",
+      "distance_m": 720,
+      "availability_status": "likely_available",
+      "price_krw": 42000,
+      "scores": {
+        "similarity": 0.82,
+        "final": 0.89
+      },
+      "reason_codes": ["NEARBY_VENUE", "WITHIN_BUDGET"],
+      "source_revisions": {
+        "place_revision": "place_rev_12",
+        "inventory_revision": "inv_rev_8",
+        "price_revision": "price_rev_3"
+      },
+      "freshness_status": "fresh"
+    }
+  ]
+}
+```
+
+Venue results MUST be generated from map/place read-model snapshots documented
+in `../recommendation/map-read-model.md`.
 
 ### `RecommendationService.RecordRecommendationEvent`
 

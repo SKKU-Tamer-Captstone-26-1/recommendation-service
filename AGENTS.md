@@ -39,6 +39,7 @@ A task is non-trivial if it changes any of the following:
 - map/place data ownership
 - recommendation scoring
 - RAG or knowledge-base behavior
+- assistant behavior
 - Kakao API usage
 - admin workflow
 - migration strategy
@@ -51,6 +52,7 @@ Before planning implementation, read these documents in order:
 README.md
 docs/README.md
 docs/architecture.md
+docs/implementation-readiness.md
 .agent/HARNESS.md
 .agent/DOMAIN_BOUNDARIES.md
 ```
@@ -68,11 +70,8 @@ For recommendation work, also read:
 ```text
 docs/recommendation/map-read-model.md
 docs/recommendation/recommendation-logic.md
-docs/recommendation/snapshot-sync.md
+docs/recommendation/sync-flow.md
 ```
-
-If `docs/recommendation/snapshot-sync.md` does not exist yet, use
-`docs/recommendation/sync-flow.md` as the current source of truth.
 
 For RAG/chatbot work, also read:
 

@@ -64,6 +64,7 @@ Client
   -> gateway-service
       -> auth-service
       -> survey-service
+      -> map-service/place-service
       -> assistant-service
       -> recommendation-service
 ```
@@ -79,6 +80,7 @@ Service ownership:
 | `auth-service` | OAuth, users, JWT issuing, identity lifecycle | Surveys, recommendations |
 | `gateway-service` | Public routing, request validation, edge concerns | Business state |
 | `survey-service` | Survey schemas, raw answers, answer revisions | Taste vectors, recommendations |
+| `map-service` / `place-service` | Canonical places, menus, inventory, prices, location data | Recommendation scoring, taste profiles |
 | `assistant-service` | App-domain conversational orchestration and grounded natural-language answers | Auth, raw survey truth, recommendation ranking, canonical place data |
 | `recommendation-service` | Derived taste profiles, vectors, scoring metadata, recommendation logs | Auth, raw survey truth |
 
@@ -86,6 +88,10 @@ Assistant architecture is documented in `assistant/assistant-architecture.md`.
 The assistant MUST call `recommendation-service` for deterministic
 recommendation facts. RAG and LLM generation MUST NOT replace recommendation
 ranking.
+
+Implementation gates are documented in `implementation-readiness.md`.
+Before real implementation, any code change MUST identify which gate it satisfies
+and which source-of-truth doc owns the behavior.
 
 ## Storage Architecture
 
@@ -111,6 +117,9 @@ Qdrant
 
 Qdrant MUST NOT contain the only copy of any state required for rebuild,
 explanation, or audit.
+
+Map/place data inside `recommendation-service` is snapshot/read-model state only.
+It must be rebuildable from map-service/place-service APIs, events, or snapshots.
 
 ## High-Level Survey Sync Flow
 
@@ -184,7 +193,7 @@ or return an insufficient-data answer.
 
 MVP deployment SHOULD use:
 
-- One gRPC service process/container.
+- One recommendation gRPC service process/container.
 - Optional FastAPI health/debug process/container.
 - One background worker process/container for sync and indexing.
 - PostgreSQL with PostGIS.
@@ -194,6 +203,9 @@ MVP deployment SHOULD use:
 
 MVP deployment SHOULD NOT require Kafka, Airflow, Redis, or an ML serving stack.
 
+Assistant runtime is not part of the initial recommendation-service MVP unless a
+separate implementation decision explicitly places it in this repository.
+
 ## Failure Boundaries
 
 - If survey sync fails, recommendation profile status becomes `failed_generation`
@@ -202,3 +214,7 @@ MVP deployment SHOULD NOT require Kafka, Airflow, Redis, or an ML serving stack.
   marked `pending` or `failed`.
 - If recommendation profile is missing, APIs return a typed profile status rather
   than inventing recommendations from raw survey data.
+- If map/place snapshot sync fails, venue recommendations may be stale or
+  unavailable, but canonical map/place state remains owned by map-service.
+- If assistant grounding fails, assistant-service must return refusal or
+  insufficient-data output instead of inventing an answer.

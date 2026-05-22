@@ -79,11 +79,15 @@ Candidate sources:
 | Target Type | Source |
 |---|---|
 | Beverage | `beverage_items` + beverage vector collection |
-| Venue | `venues`, `venue_menu_items`, venue vector collection |
-| Menu item | `venue_menu_items` + menu item vector collection |
+| Venue | `venue_snapshots`, `venue_inventory_snapshots`, `venue_price_snapshots`, venue vector collection |
+| Menu item | `venue_menu_snapshots` + menu item vector collection |
 
 Qdrant SHOULD retrieve more candidates than the API limit so reranking can apply
 metadata and diversity rules.
+
+Venue and menu-item sources are read-model snapshots from
+map-service/place-service. They are not canonical place/menu/inventory/price
+tables.
 
 ## Hard Filters
 
@@ -93,6 +97,9 @@ Hard filters remove candidates before final scoring:
 - unsupported category
 - unavailable market flag
 - outside requested venue radius
+- hidden, closed, merged, or unpublished venue snapshot
+- expired inventory snapshot when no fallback is allowed
+- expired price snapshot when strict budget comparison is requested
 - incompatible price range when caller requests strict budget filtering
 - blocked or administratively hidden item
 
@@ -110,6 +117,9 @@ final_score =
   + experience_fit
   + popularity_or_quality
   + distance_fit
+  + availability_confidence
+  + price_confidence
+  + freshness_adjustment
   + diversity_adjustment
 ```
 
@@ -121,6 +131,7 @@ Every response result MUST store:
 - scoring config version
 - profile revision ID
 - target type and target ID
+- source snapshot revisions for venue results
 
 ## Category-Specific Behavior
 
@@ -174,6 +185,10 @@ ADJACENT_DISCOVERY
 Explanation text MUST be generated from stored reason codes and score
 contributions. V1 MUST NOT depend on unbounded LLM-generated explanations.
 
+LLM or assistant-generated prose MAY rewrite deterministic explanations only when
+the grounded context includes the original reason codes and score metadata. It
+MUST NOT change ranking or invent reasons.
+
 ## Logging
 
 Persist:
@@ -182,8 +197,8 @@ Persist:
 - ranked results
 - score breakdowns
 - explanation payloads
+- map/place snapshot revisions for venue results
 - user interactions such as click, save, dismiss, and detail view
 
 Recommendation logs are product analytics and debugging data. They are not raw
 survey truth.
-

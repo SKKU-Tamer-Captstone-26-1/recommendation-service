@@ -14,6 +14,7 @@ Relevant documents:
 
 - `AGENTS.md`
 - `.agent/HARNESS.md`
+- `docs/implementation-readiness.md`
 - `<domain docs>`
 
 Relevant existing files:
@@ -38,6 +39,13 @@ API / event / snapshot / migration / documentation only
 ## 5. Proposed Change
 
 Describe the smallest scoped change.
+
+Implementation readiness gate:
+
+```text
+service boundary | API contract | database contract | sync contract |
+recommendation contract | assistant contract | verification contract
+```
 
 ## 6. Database Plan
 
@@ -113,4 +121,3 @@ Changed files
 Verification
 Risks / Follow-ups
 ```
-

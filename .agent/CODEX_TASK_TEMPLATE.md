@@ -20,6 +20,7 @@ Read first:
 AGENTS.md
 .agent/HARNESS.md
 .agent/DOMAIN_BOUNDARIES.md
+docs/implementation-readiness.md
 ```
 
 Then read:
@@ -54,6 +55,7 @@ Follow these rules:
 - recommendation-service consumes map snapshots only.
 - Kakao API must not be used as canonical bulk-ingestion source.
 - RAG must not be used as recommendation ranking logic.
+- LLMs must not rank recommendations or invent app facts.
 ```
 
 ## Required Harness
@@ -99,4 +101,3 @@ Changed files
 Verification
 Risks / Follow-ups
 ```
-

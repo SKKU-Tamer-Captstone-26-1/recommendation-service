@@ -49,6 +49,12 @@ If target service is unknown, stop and ask.
 
 Read the required documents from `AGENTS.md`.
 
+For implementation tasks, also read:
+
+```text
+docs/implementation-readiness.md
+```
+
 For each task, Codex must identify:
 
 - relevant existing files

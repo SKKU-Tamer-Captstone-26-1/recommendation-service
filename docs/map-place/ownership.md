@@ -22,7 +22,9 @@ map-service(place-service) DB
         v
 1. Map screen displays active/published places
 2. Recommendation service consumes snapshot/read model
-3. Chatbot calls map-service tool/API for live place data
+3. Assistant uses recommendation-service venue recommendations for ranked answers
+4. Chatbot calls map-service tool/API for live place data when a ranked
+   recommendation is not being requested
 ```
 
 ## Clients
@@ -57,6 +59,16 @@ recommendation-service
   -> map-service internal API or event sync
   -> stores venue/menu/inventory snapshots
   -> uses snapshots for scoring
+```
+
+### Assistant / Chatbot
+
+Read-only orchestration client.
+
+```text
+assistant-service
+  -> recommendation-service for ranked venue recommendations
+  -> map-service tool/API only for live non-ranking place facts
 ```
 
 ## Ownership Table

@@ -62,6 +62,8 @@ introduced safely.
 - Write migrations so deployed old and new code can coexist during rollout when
   possible.
 - Every migration touching rebuildable state must define rebuild impact.
+- Before the first production migration, confirm `implementation-readiness.md`
+  database gate and ERD ownership boundaries.
 
 ## Schema Migration Template
 
@@ -156,3 +158,6 @@ Update docs before or with migrations affecting:
 - API contracts
 - rebuild/recovery behavior
 
+Do not create migrations for map-service/place-service canonical tables in this
+repository. Only create recommendation-owned tables and map/place read-model
+snapshot tables.

@@ -5,6 +5,10 @@
 This document defines the conceptual database structure for
 map-service/place-service.
 
+This is not the implementation schema for `recommendation-service`.
+Recommendation-service stores only the read-model snapshots documented in
+`../recommendation/map-read-model.md` and `../database/erd.md`.
+
 The goal is to support:
 
 - map display
@@ -18,6 +22,8 @@ The goal is to support:
 - source conflict resolution
 
 ## Core Tables
+
+These tables belong in map-service/place-service, not in this repository.
 
 ```text
 places
@@ -166,4 +172,3 @@ venue_price_offers.place_id
 venue_price_offers.beverage_id
 venue_price_offers.valid_until
 ```
-

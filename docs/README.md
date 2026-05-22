@@ -24,6 +24,7 @@ The `.agent/` directory defines the required Codex harness for non-trivial work.
 - Domain documentation map.
 - Source-of-truth document list.
 - Harness document list.
+- Pre-implementation readiness gates.
 - AI-friendly formatting conventions.
 - Cross-document consistency rules.
 - Update rules for documentation changes.
@@ -55,6 +56,8 @@ The `.agent/` directory defines the required Codex harness for non-trivial work.
 - Documents must be short enough to keep current.
 - Every versioned recommendation artifact must be traceable.
 - Generated artifacts must not become source of truth.
+- Implementation must not begin from draft-only contracts without a documented
+  gate or decision.
 
 ### Update Rules
 
@@ -135,6 +138,7 @@ Domain docs live here:
 | Codex harness | `../.agent/HARNESS.md` |
 | Domain boundaries | `../.agent/DOMAIN_BOUNDARIES.md` |
 | Repository entry point | `../README.md` |
+| Implementation readiness | `implementation-readiness.md` |
 | Architecture and ownership | `architecture.md` |
 | Map/place ownership | `map-place/ownership.md` |
 | Map/place conceptual database | `map-place/database.md` |
@@ -162,15 +166,16 @@ For a new human or AI contributor:
 2. `../README.md`
 3. `../.agent/HARNESS.md`
 4. `../.agent/DOMAIN_BOUNDARIES.md`
-5. `architecture.md`
-6. `recommendation/sync-flow.md`
-7. `database/erd.md`
-8. `recommendation/vector-schema.md`
-9. `recommendation/survey-mapping.md`
-10. `recommendation/recommendation-logic.md`
-11. `api/recommendation-api.md`
-12. `database/migration-strategy.md`
-13. `decisions/adr-001-derived-state.md`
+5. `implementation-readiness.md`
+6. `architecture.md`
+7. `recommendation/sync-flow.md`
+8. `database/erd.md`
+9. `recommendation/vector-schema.md`
+10. `recommendation/survey-mapping.md`
+11. `recommendation/recommendation-logic.md`
+12. `api/recommendation-api.md`
+13. `database/migration-strategy.md`
+14. `decisions/adr-001-derived-state.md`
 
 For map/place work, also read:
 
@@ -199,6 +204,7 @@ For assistant/chatbot work, also read:
 docs/
 - README.md
 - architecture.md
+- implementation-readiness.md
 - assistant/
   - assistant-architecture.md
   - rag-policy.md

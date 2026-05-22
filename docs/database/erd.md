@@ -26,6 +26,7 @@ metadata for `recommendation-service`.
 
 - Raw survey-service tables.
 - Auth-service user tables.
+- Canonical map-service/place-service tables.
 - Full SQL migration code.
 - Recommendation scoring formulas.
 
@@ -64,7 +65,8 @@ Canonical recommendation-owned state:
 - mapper versions
 - recommendation vectors
 - scoring configs
-- catalog data curated by recommendation-service
+- beverage catalog data curated by recommendation-service
+- map/place read-model snapshots copied from map-service/place-service
 - recommendation request/result/explanation logs
 - sync cursors and failure state
 
@@ -72,6 +74,16 @@ Derived rebuildable state:
 
 - Qdrant collections
 - Qdrant point payloads
+
+## Implementation Readiness Rules
+
+Before writing migrations:
+
+- Implement version registry tables before generated profile/vector tables.
+- Implement read-model snapshot tables, not canonical map/place tables.
+- Keep survey source snapshots as generation evidence, not survey ownership.
+- Add retry/dead-letter tables before enabling sync workers.
+- Store vectors in PostgreSQL before indexing Qdrant.
 
 ## ERD
 
@@ -86,8 +98,10 @@ erDiagram
     recommendation_vectors ||--o{ qdrant_points : indexed_as
 
     beverage_items ||--o{ flavor_profiles : has
-    venues ||--o{ venue_menu_items : has
-    venue_menu_items ||--o{ flavor_profiles : has
+    venue_snapshots ||--o{ venue_inventory_snapshots : has
+    venue_snapshots ||--o{ venue_price_snapshots : has
+    venue_snapshots ||--o{ venue_menu_snapshots : has
+    venue_menu_snapshots ||--o{ flavor_profiles : may_have
     flavor_profiles ||--o{ recommendation_vectors : produces
 
     recommendation_requests ||--o{ recommendation_results : returns
@@ -233,19 +247,75 @@ Key fields:
 - `active`
 - `search_document`
 
-### `venues`
+### `venue_snapshots`
 
-Bars, bottle shops, and experience locations.
+Read-model snapshots of map-service/place-service venue data.
+
+This table is not canonical place storage.
 
 Key fields:
 
+- `place_id`
+- `place_revision`
 - `name`
-- `type`
+- `place_type`
 - `address`
 - `location geography(Point, 4326)`
-- `price_level`
-- `active`
+- `status`
+- `publication_status`
 - `search_document`
+- `snapshot_json`
+- `source_event_id`
+- `synced_at`
+- `stale_after`
+
+### `venue_menu_snapshots`
+
+Read-model snapshots of published menu data.
+
+Key fields:
+
+- `place_id`
+- `menu_item_id`
+- `menu_revision`
+- `beverage_id`
+- `menu_name`
+- `menu_type`
+- `status`
+- `snapshot_json`
+- `synced_at`
+
+### `venue_inventory_snapshots`
+
+Read-model snapshots of availability data.
+
+Key fields:
+
+- `place_id`
+- `beverage_id`
+- `inventory_revision`
+- `availability_status`
+- `confidence`
+- `last_seen_at`
+- `expires_at`
+- `synced_at`
+
+### `venue_price_snapshots`
+
+Read-model snapshots of price data.
+
+Key fields:
+
+- `place_id`
+- `beverage_id`
+- `menu_item_id`
+- `price_revision`
+- `price_krw`
+- `price_type`
+- `confidence`
+- `valid_from`
+- `valid_until`
+- `synced_at`
 
 ### `recommendation_requests`
 
@@ -258,6 +328,7 @@ Key fields:
 - `target_type`
 - `filters_json`
 - `scoring_config_id`
+- `request_context_json`
 - `created_at`
 
 ### `recommendation_results`
@@ -273,6 +344,8 @@ Key fields:
 - `similarity_score`
 - `final_score`
 - `score_breakdown_json`
+- `reason_codes`
+- `source_snapshot_json`
 
 ### `recommendation_explanations`
 
@@ -314,7 +387,14 @@ taste_profile_revisions(survey_response_id, survey_response_revision, mapper_ver
 recommendation_vectors(owner_type, owner_id, vector_schema_version_id)
 qdrant_points(collection_name, point_id)
 beverage_items(category, active)
-venues using gist(location)
+venue_snapshots using gist(location)
+venue_snapshots(place_id, place_revision)
+venue_snapshots(status, stale_after)
+venue_menu_snapshots(place_id, beverage_id)
+venue_inventory_snapshots(place_id, beverage_id, availability_status)
+venue_inventory_snapshots(expires_at)
+venue_price_snapshots(place_id, beverage_id)
+venue_price_snapshots(valid_until)
 survey_sync_events(event_id)
 survey_sync_events(status, next_retry_at)
 recommendation_results(request_id, rank)
@@ -324,7 +404,7 @@ Hybrid search indexes:
 
 ```text
 beverage_items.search_document using gin
-venues.search_document using gin
+venue_snapshots.search_document using gin
 trigram index on searchable Korean/English names
 ```
 
@@ -360,4 +440,3 @@ Qdrant payloads SHOULD include only filterable metadata:
   "source_hash": "sha256..."
 }
 ```
-

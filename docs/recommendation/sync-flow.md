@@ -75,6 +75,15 @@ survey-service durable event source
 This can later move to a message broker without changing event semantics.
 `recommendation-service` MUST NOT use direct survey database access.
 
+Before implementation, confirm the exact SurveyService RPC contract for:
+
+```text
+ListSurveyEvents(cursor, limit)
+GetSurveyResponse(survey_response_id, response_revision)
+```
+
+Do not implement sync against survey-service private tables or inferred schemas.
+
 ## Event Contract
 
 Minimum survey event:
@@ -182,6 +191,9 @@ Failures MUST persist:
 - next retry time
 - dead-letter reason when applicable
 
+Dead-lettered events MUST be inspectable and replayable after the underlying
+contract or data issue is fixed.
+
 ## Rebuild Flow
 
 ```text
@@ -196,3 +208,7 @@ Failures MUST persist:
 
 Qdrant rebuild MUST start from PostgreSQL vectors, not from survey-service
 directly.
+
+Profile rebuild MUST fetch canonical survey responses through survey-service
+APIs. Stored generation snapshots may be used for audit comparison but are not
+the primary rebuild source when survey-service is available.

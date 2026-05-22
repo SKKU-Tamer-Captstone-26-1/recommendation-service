@@ -58,6 +58,15 @@ dimension order, value semantics, and schema evolution.
 
 ## Current Schema: `taste_v1`
 
+Implementation status:
+
+```text
+pre-implementation frozen candidate
+```
+
+Do not change `taste_v1` during initial implementation unless the change creates
+a new documented schema version before migrations are written.
+
 Distance metric:
 
 ```text
@@ -135,6 +144,22 @@ mean the user dislikes the trait.
 
 Do not create category-specific meanings for the same dimension.
 
+## ML Embedding Strategy
+
+Future ML embeddings MUST be stored as separate vector families or schema
+versions. They MUST NOT silently replace `taste_v1` semantics.
+
+Example future vector families:
+
+```text
+taste_v1              -- explainable taste dimensions
+beverage_text_embed_v1 -- model embedding for beverage text search
+venue_text_embed_v1    -- model embedding for venue text search
+```
+
+Explainable recommendation scoring MUST keep reason-code traceability even when
+future ML embeddings are added.
+
 ## Version Migration Rules
 
 Create a new vector schema version when:
@@ -155,4 +180,3 @@ Migration checklist:
 5. Rebuild Qdrant collections.
 6. Verify counts, hashes, and sample recommendations.
 ```
-

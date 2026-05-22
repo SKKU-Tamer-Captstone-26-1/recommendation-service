@@ -44,6 +44,15 @@ The assistant MUST NOT answer unrelated general questions.
 
 The assistant is an orchestration layer behind `gateway-service`.
 
+Implementation status:
+
+```text
+draft design contract
+```
+
+Do not implement assistant runtime until `../implementation-readiness.md`
+Assistant Contract gate is satisfied.
+
 ```text
 Client
   -> gateway-service

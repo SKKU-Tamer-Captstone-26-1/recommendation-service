@@ -7,6 +7,7 @@ Use this checklist before Codex reports completion.
 ```text
 - [ ] Task scope was restated.
 - [ ] Required docs were read.
+- [ ] `docs/implementation-readiness.md` was checked for implementation work.
 - [ ] Ownership boundary was checked.
 - [ ] Changes stayed inside scope.
 - [ ] No speculative infrastructure was added.

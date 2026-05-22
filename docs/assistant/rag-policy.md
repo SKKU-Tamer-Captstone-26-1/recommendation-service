@@ -8,6 +8,9 @@ context.
 RAG is allowed only as a context-building and explanation-support mechanism.
 RAG MUST NOT be used as the recommendation ranking engine.
 
+This is a pre-implementation policy. It must be implemented with tests before
+any production assistant runtime is enabled.
+
 ## Core Rule
 
 ```text
