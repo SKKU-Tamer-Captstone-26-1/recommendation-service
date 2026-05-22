@@ -63,7 +63,7 @@ class RecommendationResult(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     rank: Mapped[int] = mapped_column(Integer, nullable=False)
     target_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    target_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    target_id: Mapped[str] = mapped_column(String(128), nullable=False)
     similarity_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     final_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     score_breakdown_json: Mapped[JsonDict] = mapped_column(

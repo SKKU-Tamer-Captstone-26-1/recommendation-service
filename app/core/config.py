@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     survey_events_poll_interval_seconds: int = 10
     survey_events_page_size: int = 100
 
+    map_service_url: str = "http://localhost:8083"
+    map_service_grpc_addr: str = "localhost:50054"
+
     sync_worker_enabled: bool = True
     sync_max_attempts: int = 5
     sync_retry_base_seconds: int = 30

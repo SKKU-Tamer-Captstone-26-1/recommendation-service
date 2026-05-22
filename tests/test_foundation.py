@@ -7,6 +7,17 @@ from app.grpc.server import create_grpc_server
 from app.main import app
 
 
+def test_live_health_endpoint_is_dependency_free() -> None:
+    client = TestClient(app)
+
+    response = client.get("/health/live")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ok"
+    assert payload["dependencies"] == []
+
+
 def test_service_status_exposes_active_foundation_versions() -> None:
     client = TestClient(app)
 
@@ -29,11 +40,17 @@ def test_model_metadata_registers_foundation_tables() -> None:
         "mapper_versions",
         "recommendation_vectors",
         "qdrant_points",
+        "venue_snapshots",
+        "venue_menu_snapshots",
+        "venue_inventory_snapshots",
+        "venue_price_snapshots",
         "survey_sync_events",
         "dead_letter_events",
     }
 
     assert required_tables.issubset(Base.metadata.tables)
+    assert "venues" not in Base.metadata.tables
+    assert "venue_menu_items" not in Base.metadata.tables
 
 
 def test_taste_v1_dimension_order_is_stable() -> None:

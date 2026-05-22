@@ -236,46 +236,103 @@ def upgrade() -> None:
     op.execute("CREATE INDEX ix_beverage_items_name_en_trgm ON beverage_items USING gin (name_en gin_trgm_ops)")
 
     op.create_table(
-        "venues",
+        "venue_snapshots",
         _uuid_pk(),
+        sa.Column("place_id", sa.String(length=128), nullable=False),
+        sa.Column("place_revision", sa.String(length=128), nullable=False),
         sa.Column("name", sa.String(length=255), nullable=False),
-        sa.Column("type", sa.String(length=100), nullable=False),
+        sa.Column("place_type", sa.String(length=100), nullable=False),
         sa.Column("address", sa.Text(), nullable=True),
         sa.Column(
             "location",
             Geography(geometry_type="POINT", srid=4326, spatial_index=False),
             nullable=True,
         ),
-        sa.Column("price_level", sa.String(length=50), nullable=True),
-        sa.Column("active", sa.Boolean(), nullable=False),
-        sa.Column("description", sa.Text(), nullable=True),
+        sa.Column("status", sa.String(length=50), nullable=False),
+        sa.Column("publication_status", sa.String(length=50), nullable=True),
         sa.Column("search_document", postgresql.TSVECTOR(), nullable=True),
-        sa.Column("metadata_json", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column("snapshot_json", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column("source_event_id", sa.String(length=128), nullable=True),
+        sa.Column("synced_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("stale_after", sa.DateTime(timezone=True), nullable=True),
         *_timestamps(),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_venues_type_active", "venues", ["type", "active"])
-    op.create_index("ix_venues_location", "venues", ["location"], postgresql_using="gist")
-    op.create_index("ix_venues_search_document", "venues", ["search_document"], postgresql_using="gin")
-    op.execute("CREATE INDEX ix_venues_name_trgm ON venues USING gin (name gin_trgm_ops)")
+    op.create_index("ix_venue_snapshots_place_revision", "venue_snapshots", ["place_id", "place_revision"])
+    op.create_index("ix_venue_snapshots_status_stale", "venue_snapshots", ["status", "stale_after"])
+    op.create_index("ix_venue_snapshots_location", "venue_snapshots", ["location"], postgresql_using="gist")
+    op.create_index("ix_venue_snapshots_search_document", "venue_snapshots", ["search_document"], postgresql_using="gin")
+    op.execute("CREATE INDEX ix_venue_snapshots_name_trgm ON venue_snapshots USING gin (name gin_trgm_ops)")
 
     op.create_table(
-        "venue_menu_items",
+        "venue_menu_snapshots",
         _uuid_pk(),
-        sa.Column("venue_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("venue_snapshot_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("place_id", sa.String(length=128), nullable=False),
+        sa.Column("menu_item_id", sa.String(length=128), nullable=False),
+        sa.Column("menu_revision", sa.String(length=128), nullable=False),
         sa.Column("beverage_item_id", postgresql.UUID(as_uuid=True), nullable=True),
-        sa.Column("name", sa.String(length=255), nullable=False),
-        sa.Column("category", sa.String(length=100), nullable=True),
-        sa.Column("price_krw", sa.Integer(), nullable=True),
-        sa.Column("active", sa.Boolean(), nullable=False),
-        sa.Column("metadata_json", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column("menu_name", sa.String(length=255), nullable=False),
+        sa.Column("menu_type", sa.String(length=100), nullable=True),
+        sa.Column("status", sa.String(length=50), nullable=False),
+        sa.Column("snapshot_json", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column("synced_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         *_timestamps(),
         sa.ForeignKeyConstraint(["beverage_item_id"], ["beverage_items.id"], ondelete="SET NULL"),
-        sa.ForeignKeyConstraint(["venue_id"], ["venues.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["venue_snapshot_id"], ["venue_snapshots.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_venue_menu_items_venue_active", "venue_menu_items", ["venue_id", "active"])
-    op.create_index("ix_venue_menu_items_category_active", "venue_menu_items", ["category", "active"])
+    op.create_index("ix_venue_menu_snapshots_place_beverage", "venue_menu_snapshots", ["place_id", "beverage_item_id"])
+    op.create_index("ix_venue_menu_snapshots_place_menu", "venue_menu_snapshots", ["place_id", "menu_item_id"])
+
+    op.create_table(
+        "venue_inventory_snapshots",
+        _uuid_pk(),
+        sa.Column("venue_snapshot_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("place_id", sa.String(length=128), nullable=False),
+        sa.Column("beverage_item_id", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("source_beverage_id", sa.String(length=128), nullable=True),
+        sa.Column("inventory_revision", sa.String(length=128), nullable=False),
+        sa.Column("availability_status", sa.String(length=50), nullable=False),
+        sa.Column("confidence", sa.Float(), nullable=True),
+        sa.Column("last_seen_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("synced_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("snapshot_json", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        *_timestamps(),
+        sa.ForeignKeyConstraint(["beverage_item_id"], ["beverage_items.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(["venue_snapshot_id"], ["venue_snapshots.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        "ix_venue_inventory_snapshots_lookup",
+        "venue_inventory_snapshots",
+        ["place_id", "beverage_item_id", "availability_status"],
+    )
+    op.create_index("ix_venue_inventory_snapshots_expires", "venue_inventory_snapshots", ["expires_at"])
+
+    op.create_table(
+        "venue_price_snapshots",
+        _uuid_pk(),
+        sa.Column("venue_snapshot_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("place_id", sa.String(length=128), nullable=False),
+        sa.Column("beverage_item_id", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("menu_item_id", sa.String(length=128), nullable=True),
+        sa.Column("price_revision", sa.String(length=128), nullable=False),
+        sa.Column("price_krw", sa.Integer(), nullable=False),
+        sa.Column("price_type", sa.String(length=50), nullable=True),
+        sa.Column("confidence", sa.Float(), nullable=True),
+        sa.Column("valid_from", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("valid_until", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("synced_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("snapshot_json", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        *_timestamps(),
+        sa.ForeignKeyConstraint(["beverage_item_id"], ["beverage_items.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(["venue_snapshot_id"], ["venue_snapshots.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index("ix_venue_price_snapshots_place_beverage", "venue_price_snapshots", ["place_id", "beverage_item_id"])
+    op.create_index("ix_venue_price_snapshots_valid_until", "venue_price_snapshots", ["valid_until"])
 
     op.create_table(
         "flavor_profiles",
@@ -315,7 +372,7 @@ def upgrade() -> None:
         sa.Column("request_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("rank", sa.Integer(), nullable=False),
         sa.Column("target_type", sa.String(length=50), nullable=False),
-        sa.Column("target_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("target_id", sa.String(length=128), nullable=False),
         sa.Column("similarity_score", sa.Float(), nullable=True),
         sa.Column("final_score", sa.Float(), nullable=True),
         sa.Column("score_breakdown_json", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
@@ -465,14 +522,21 @@ def downgrade() -> None:
     op.drop_table("recommendation_requests")
     op.drop_index("ix_flavor_profiles_owner", table_name="flavor_profiles")
     op.drop_table("flavor_profiles")
-    op.drop_index("ix_venue_menu_items_category_active", table_name="venue_menu_items")
-    op.drop_index("ix_venue_menu_items_venue_active", table_name="venue_menu_items")
-    op.drop_table("venue_menu_items")
-    op.execute("DROP INDEX IF EXISTS ix_venues_name_trgm")
-    op.drop_index("ix_venues_search_document", table_name="venues")
-    op.drop_index("ix_venues_location", table_name="venues")
-    op.drop_index("ix_venues_type_active", table_name="venues")
-    op.drop_table("venues")
+    op.drop_index("ix_venue_price_snapshots_valid_until", table_name="venue_price_snapshots")
+    op.drop_index("ix_venue_price_snapshots_place_beverage", table_name="venue_price_snapshots")
+    op.drop_table("venue_price_snapshots")
+    op.drop_index("ix_venue_inventory_snapshots_expires", table_name="venue_inventory_snapshots")
+    op.drop_index("ix_venue_inventory_snapshots_lookup", table_name="venue_inventory_snapshots")
+    op.drop_table("venue_inventory_snapshots")
+    op.drop_index("ix_venue_menu_snapshots_place_menu", table_name="venue_menu_snapshots")
+    op.drop_index("ix_venue_menu_snapshots_place_beverage", table_name="venue_menu_snapshots")
+    op.drop_table("venue_menu_snapshots")
+    op.execute("DROP INDEX IF EXISTS ix_venue_snapshots_name_trgm")
+    op.drop_index("ix_venue_snapshots_search_document", table_name="venue_snapshots")
+    op.drop_index("ix_venue_snapshots_location", table_name="venue_snapshots")
+    op.drop_index("ix_venue_snapshots_status_stale", table_name="venue_snapshots")
+    op.drop_index("ix_venue_snapshots_place_revision", table_name="venue_snapshots")
+    op.drop_table("venue_snapshots")
     op.execute("DROP INDEX IF EXISTS ix_beverage_items_name_en_trgm")
     op.execute("DROP INDEX IF EXISTS ix_beverage_items_name_ko_trgm")
     op.drop_index("ix_beverage_items_search_document", table_name="beverage_items")

@@ -26,15 +26,15 @@ class DistanceMetric(StrEnum):
 class VectorOwnerType(StrEnum):
     PROFILE_REVISION = "profile_revision"
     BEVERAGE_ITEM = "beverage_item"
-    VENUE = "venue"
-    VENUE_MENU_ITEM = "venue_menu_item"
+    VENUE_SNAPSHOT = "venue_snapshot"
+    VENUE_MENU_SNAPSHOT = "venue_menu_snapshot"
     FLAVOR_PROFILE = "flavor_profile"
 
 
 class FlavorProfileOwnerType(StrEnum):
     BEVERAGE_ITEM = "beverage_item"
-    VENUE = "venue"
-    VENUE_MENU_ITEM = "venue_menu_item"
+    VENUE_SNAPSHOT = "venue_snapshot"
+    VENUE_MENU_SNAPSHOT = "venue_menu_snapshot"
 
 
 class RecommendationTargetType(StrEnum):
@@ -72,4 +72,3 @@ class InteractionEventType(StrEnum):
     SAVE = "save"
     DISMISS = "dismiss"
     DETAIL_VIEW = "detail_view"
-

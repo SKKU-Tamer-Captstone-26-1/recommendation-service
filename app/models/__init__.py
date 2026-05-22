@@ -1,5 +1,12 @@
 from app.models.base import Base
-from app.models.catalog import BeverageItem, FlavorProfile, Venue, VenueMenuItem
+from app.models.catalog import (
+    BeverageItem,
+    FlavorProfile,
+    VenueInventorySnapshot,
+    VenueMenuSnapshot,
+    VenuePriceSnapshot,
+    VenueSnapshot,
+)
 from app.models.profile import (
     SurveySourceSnapshot,
     TasteProfileRevision,
@@ -37,7 +44,8 @@ __all__ = [
     "TasteProfileRevision",
     "UserProfileState",
     "VectorSchemaVersion",
-    "Venue",
-    "VenueMenuItem",
+    "VenueInventorySnapshot",
+    "VenueMenuSnapshot",
+    "VenuePriceSnapshot",
+    "VenueSnapshot",
 ]
-

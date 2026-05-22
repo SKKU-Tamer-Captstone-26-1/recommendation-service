@@ -1,7 +1,18 @@
 import uuid
+from datetime import datetime
 
 from geoalchemy2 import Geography
-from sqlalchemy import Boolean, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -34,62 +45,198 @@ class BeverageItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     search_document: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True)
     metadata_json: Mapped[JsonDict] = mapped_column(JSONB, nullable=False, default=dict)
 
-    menu_items = relationship("VenueMenuItem", back_populates="beverage_item")
-
-
-class Venue(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "venues"
-    __table_args__ = (
-        Index("ix_venues_type_active", "type", "active"),
-        Index("ix_venues_location", "location", postgresql_using="gist"),
-        Index("ix_venues_search_document", "search_document", postgresql_using="gin"),
+    menu_snapshots = relationship(
+        "VenueMenuSnapshot",
+        back_populates="beverage_item",
+    )
+    inventory_snapshots = relationship(
+        "VenueInventorySnapshot",
+        back_populates="beverage_item",
+    )
+    price_snapshots = relationship(
+        "VenuePriceSnapshot",
+        back_populates="beverage_item",
     )
 
+
+class VenueSnapshot(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "venue_snapshots"
+    __table_args__ = (
+        Index("ix_venue_snapshots_place_revision", "place_id", "place_revision"),
+        Index("ix_venue_snapshots_status_stale", "status", "stale_after"),
+        Index("ix_venue_snapshots_location", "location", postgresql_using="gist"),
+        Index(
+            "ix_venue_snapshots_search_document",
+            "search_document",
+            postgresql_using="gin",
+        ),
+    )
+
+    place_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    place_revision: Mapped[str] = mapped_column(String(128), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    type: Mapped[str] = mapped_column(String(100), nullable=False)
+    place_type: Mapped[str] = mapped_column(String(100), nullable=False)
     address: Mapped[str | None] = mapped_column(Text, nullable=True)
     location = mapped_column(
         Geography(geometry_type="POINT", srid=4326, spatial_index=False),
         nullable=True,
     )
-    price_level: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(50), nullable=False)
+    publication_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
     search_document: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True)
-    metadata_json: Mapped[JsonDict] = mapped_column(JSONB, nullable=False, default=dict)
+    snapshot_json: Mapped[JsonDict] = mapped_column(JSONB, nullable=False, default=dict)
+    source_event_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    synced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    stale_after: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
-    menu_items = relationship(
-        "VenueMenuItem",
-        back_populates="venue",
+    menu_snapshots = relationship(
+        "VenueMenuSnapshot",
+        back_populates="venue_snapshot",
+        cascade="all, delete-orphan",
+    )
+    inventory_snapshots = relationship(
+        "VenueInventorySnapshot",
+        back_populates="venue_snapshot",
+        cascade="all, delete-orphan",
+    )
+    price_snapshots = relationship(
+        "VenuePriceSnapshot",
+        back_populates="venue_snapshot",
         cascade="all, delete-orphan",
     )
 
 
-class VenueMenuItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "venue_menu_items"
+class VenueMenuSnapshot(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "venue_menu_snapshots"
     __table_args__ = (
-        Index("ix_venue_menu_items_venue_active", "venue_id", "active"),
-        Index("ix_venue_menu_items_category_active", "category", "active"),
+        Index("ix_venue_menu_snapshots_place_beverage", "place_id", "beverage_item_id"),
+        Index("ix_venue_menu_snapshots_place_menu", "place_id", "menu_item_id"),
     )
 
-    venue_id: Mapped[uuid.UUID] = mapped_column(
+    venue_snapshot_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("venues.id", ondelete="CASCADE"),
+        ForeignKey("venue_snapshots.id", ondelete="CASCADE"),
         nullable=False,
     )
+    place_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    menu_item_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    menu_revision: Mapped[str] = mapped_column(String(128), nullable=False)
     beverage_item_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("beverage_items.id", ondelete="SET NULL"),
         nullable=True,
     )
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    category: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    price_krw: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    metadata_json: Mapped[JsonDict] = mapped_column(JSONB, nullable=False, default=dict)
+    menu_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    menu_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    status: Mapped[str] = mapped_column(String(50), nullable=False)
+    snapshot_json: Mapped[JsonDict] = mapped_column(JSONB, nullable=False, default=dict)
+    synced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
 
-    venue = relationship("Venue", back_populates="menu_items")
-    beverage_item = relationship("BeverageItem", back_populates="menu_items")
+    venue_snapshot = relationship("VenueSnapshot", back_populates="menu_snapshots")
+    beverage_item = relationship("BeverageItem", back_populates="menu_snapshots")
+
+
+class VenueInventorySnapshot(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "venue_inventory_snapshots"
+    __table_args__ = (
+        Index(
+            "ix_venue_inventory_snapshots_lookup",
+            "place_id",
+            "beverage_item_id",
+            "availability_status",
+        ),
+        Index("ix_venue_inventory_snapshots_expires", "expires_at"),
+    )
+
+    venue_snapshot_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("venue_snapshots.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    place_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    beverage_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("beverage_items.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    source_beverage_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    inventory_revision: Mapped[str] = mapped_column(String(128), nullable=False)
+    availability_status: Mapped[str] = mapped_column(String(50), nullable=False)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    last_seen_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    synced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    snapshot_json: Mapped[JsonDict] = mapped_column(JSONB, nullable=False, default=dict)
+
+    venue_snapshot = relationship("VenueSnapshot", back_populates="inventory_snapshots")
+    beverage_item = relationship("BeverageItem", back_populates="inventory_snapshots")
+
+
+class VenuePriceSnapshot(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "venue_price_snapshots"
+    __table_args__ = (
+        Index(
+            "ix_venue_price_snapshots_place_beverage",
+            "place_id",
+            "beverage_item_id",
+        ),
+        Index("ix_venue_price_snapshots_valid_until", "valid_until"),
+    )
+
+    venue_snapshot_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("venue_snapshots.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    place_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    beverage_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("beverage_items.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    menu_item_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    price_revision: Mapped[str] = mapped_column(String(128), nullable=False)
+    price_krw: Mapped[int] = mapped_column(Integer, nullable=False)
+    price_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    valid_from: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    valid_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    synced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    snapshot_json: Mapped[JsonDict] = mapped_column(JSONB, nullable=False, default=dict)
+
+    venue_snapshot = relationship("VenueSnapshot", back_populates="price_snapshots")
+    beverage_item = relationship("BeverageItem", back_populates="price_snapshots")
 
 
 class FlavorProfile(UUIDPrimaryKeyMixin, TimestampMixin, Base):
