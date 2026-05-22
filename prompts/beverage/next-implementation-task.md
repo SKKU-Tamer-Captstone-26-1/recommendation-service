@@ -31,15 +31,15 @@ data/beverage/knowledge_candidates.jsonl
 data/beverage/price_observation_candidates.jsonl
 ```
 
-Current candidate counts from `bev_collect_2026_05_22_kr_price_003`:
+Current candidate counts from `bev_collect_2026_05_22_kr_price_004`:
 
 | Lane | Count |
 |---|---:|
 | catalog candidates | 120 |
 | flavor profile candidates | 120 |
 | knowledge candidates | 120 |
-| price observations | 46 |
-| source registry rows | 166 |
+| price observations | 89 |
+| source registry rows | 209 |
 
 ## Required Sequence
 
@@ -76,6 +76,8 @@ The importer must verify:
 - Price observations with retailer sources are marked as non-live observations.
 - KRW price observations remain reviewer-facing point-in-time records, not
   inventory truth or strict budget-filter input.
+- Lower-confidence KRW search-result, review-card, package, and overseas-direct
+  observations remain visibly marked for human SKU/package-size review.
 - Source URLs are preserved.
 
 ## Output

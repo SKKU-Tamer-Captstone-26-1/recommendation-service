@@ -1,9 +1,9 @@
 {
-  "run_id": "bev_collect_2026_05_22_kr_price_003",
-  "previous_run_id": "bev_collect_2026_05_22_mvp_expansion_002",
+  "run_id": "bev_collect_2026_05_22_kr_price_004",
+  "previous_run_id": "bev_collect_2026_05_22_kr_price_003",
   "agent": "beverage-data-collector",
-  "task_prompt": "user-requested Korea KRW price-observation collection after mvp_expansion_002",
-  "collected_at": "2026-05-22T22:46:23+09:00",
+  "task_prompt": "user-requested broad Korea KRW price-observation expansion after kr_price_003",
+  "collected_at": "2026-05-22T23:39:00+09:00",
   "market_focus": "Korea plus globally recognizable beverages likely to appear in bars, pubs, bottle shops, liquor shops, and restaurants",
   "candidate_status_default": "needs_review",
   "copyright_policy": "Paraphrased candidate summaries only; no full source text stored.",
@@ -83,7 +83,7 @@
     "price_observation_candidates": 11,
     "source_registry_rows": 131
   },
-  "counts_added_this_run": {
+  "counts_added_by_kr_price_run_003": {
     "catalog_candidates": 0,
     "flavor_profile_candidates": 0,
     "knowledge_candidates": 0,
@@ -91,16 +91,31 @@
     "source_registry_rows": 35,
     "records_loaded_to_staging": 0
   },
-  "counts": {
+  "counts_before_this_run": {
     "catalog_candidates": 120,
     "flavor_profile_candidates": 120,
     "knowledge_candidates": 120,
     "price_observation_candidates": 46,
-    "source_registry_rows": 166,
+    "source_registry_rows": 166
+  },
+  "counts_added_this_run": {
+    "catalog_candidates": 0,
+    "flavor_profile_candidates": 0,
+    "knowledge_candidates": 0,
+    "price_observation_candidates": 43,
+    "source_registry_rows": 43,
+    "records_loaded_to_staging": 0
+  },
+  "counts": {
+    "catalog_candidates": 120,
+    "flavor_profile_candidates": 120,
+    "knowledge_candidates": 120,
+    "price_observation_candidates": 89,
+    "source_registry_rows": 209,
     "records_loaded_to_staging": 0
   },
   "price_observation_market_counts": {
-    "KR_KRW": 36,
+    "KR_KRW": 79,
     "non_kr_legacy_observations": 10
   },
   "category_progress": {
@@ -122,7 +137,7 @@
     "not_started_categories": [],
     "next_batch_plan": [
       "Human-review the 120 candidates for duplicate aliases, Korea SKU ABV, and category/style normalization.",
-      "Review KRW price observations for SKU/package-size normalization before any staging or UI use.",
+      "Review KRW price observations for SKU/package-size normalization, especially lower-confidence search/review-card rows, before any staging or UI use.",
       "Implement local/dev recommendation_staging tables and dry-run importer before any DB load."
     ]
   },
@@ -130,7 +145,7 @@
     "catalog_candidates": 0,
     "catalog_skip_details": [],
     "price_observation_candidates": 0,
-    "price_notes": "This KRW price pass added only source-backed Korea retailer/pickup observations and kept them explicitly non-live and non-canonical. Products without a clear source-backed KRW listing were not added."
+    "price_notes": "This KRW price pass added only source-backed Korea retailer/pickup, search-result, review-card, package, or overseas-direct KRW observations and kept them explicitly non-live and non-canonical. Products without visible source-backed KRW evidence were not added."
   },
   "validation_expectations": {
     "jsonl_files": [

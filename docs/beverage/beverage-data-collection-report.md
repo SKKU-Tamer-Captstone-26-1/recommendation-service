@@ -2,13 +2,19 @@
 
 ## Summary
 
-Current run ID:
+Previous KRW run ID:
 
 ```text
 bev_collect_2026_05_22_kr_price_003
 ```
 
-This price-focused run followed the expanded beverage candidate batch and added
+Latest run ID:
+
+```text
+bev_collect_2026_05_22_kr_price_004
+```
+
+The latest price-focused run followed the first KRW price pass and added broader
 Korea-focused KRW price observations. It updated candidate files only. It did
 not write production DB, canonical beverage tables, map/admin/auth/survey DBs,
 staging DB, or Qdrant.
@@ -23,11 +29,11 @@ needs_review
 
 | Lane | Before | Added this run | After |
 |---|---:|---:|---:|
-| Structured catalog candidates | 25 | 95 | 120 |
-| Flavor profile candidates | 25 | 95 | 120 |
-| Knowledge/RAG candidates | 25 | 95 | 120 |
-| Price observation candidates | 11 | 35 | 46 |
-| Source registry rows | 131 | 35 | 166 |
+| Structured catalog candidates | 120 | 0 | 120 |
+| Flavor profile candidates | 120 | 0 | 120 |
+| Knowledge/RAG candidates | 120 | 0 | 120 |
+| Price observation candidates | 46 | 43 | 89 |
+| Source registry rows | 166 | 43 | 209 |
 | Staging loaded records | 0 | 0 | 0 |
 
 ## Category Coverage
@@ -56,9 +62,11 @@ realistically likely to appear in Korean bars, pubs, restaurants, bottle shops,
 and liquor shops. Each new catalog candidate has a matching flavor profile
 candidate and Korean knowledge candidate.
 
-The KRW price pass focused on source-backed Korea retailer/pickup observations
-for products already present in the candidate catalog. It added 35 new KRW price
-records and kept them explicitly non-live and non-canonical.
+The KRW price passes focused on source-backed Korea retailer/pickup observations
+for products already present in the candidate catalog. The first KRW pass added
+35 records; the latest broad pass added 43 more. The data now has 79 KRW
+observations out of 89 total price records. All KRW records remain explicitly
+non-live and non-canonical.
 
 ## Key Decisions
 
@@ -86,16 +94,20 @@ medium confidence, and review notes rather than invented precision.
 
 ### Price Treatment
 
-Price observations are rough point-in-time, historical, suggested-retail, or
-Korea retailer/pickup references. They are not live offers, venue prices, store
-inventory truth, or strict budget-filter evidence. KRW records are intended for
-reviewer-facing display and normalization only.
+Price observations are rough point-in-time, historical, suggested-retail, Korea
+retailer/pickup, search-result, review-card, package, or overseas-direct KRW
+references. They are not live offers, venue prices, store inventory truth, or
+strict budget-filter evidence. KRW records are intended for reviewer-facing
+display and normalization only.
 
 ## Source Mix
 
 The source registry favors official producer, official importer/distributor,
 official association, and public product catalog sources for catalog/flavor
-facts. The KRW price pass added retailer sources for price observation only.
+facts. The KRW price passes added retailer sources for price observation only.
+Some lower-confidence rows use Dailyshot search-result or review-card pages when
+a direct item page was not quickly available; those rows require SKU and package
+review before any importer use.
 
 No Kakao Local/Map API source was used.
 
@@ -104,7 +116,7 @@ No Kakao Local/Map API source was used.
 | Area | Count | Reason |
 |---|---:|---|
 | Catalog candidates | 0 | No duplicate/source-uncertain catalog candidate was intentionally added. |
-| Price observations | 0 in this KRW pass | Only source-backed KRW observations were added; products without a clear Korea price source were left unchanged. |
+| Price observations | 0 in this KRW pass | Only visible source-backed KRW observations were added; products without clear Korea price evidence were left unchanged. |
 
 ## Current Usefulness
 
@@ -132,6 +144,7 @@ This batch is not yet sufficient for:
 | Some source URLs are official broad product/brand pages | Reviewer should confirm exact product page URL before approval |
 | Flavor values are candidate estimates | Human review and deterministic import validation required |
 | KRW price data is point-in-time retailer data | Normalize package size, SKU, and freshness before UI or scoring use |
+| Some KRW sources are search-result or review-card observations | Treat as low-confidence display evidence until direct item page or receipt/source proof is reviewed |
 | Cocktail ABV depends on recipe and dilution | Keep cocktail ABV null until normalized recipe model exists |
 | Staging schema is absent | Implement `recommendation_staging` before DB import |
 
@@ -141,4 +154,4 @@ This batch is not yet sufficient for:
 2. Dry-run the expanded 120-candidate batch into local/dev staging only.
 3. Human-review candidate identity, ABV, Korea SKU, aliases, and flavor vectors.
 4. Promote a reviewed seed subset through a separate canonical import workflow.
-5. Add more Korea KRW observations for sake/shochu, rum, cognac, and liqueur gaps after staging validation exists.
+5. Continue filling Korea KRW gaps with non-Dailyshot and direct item sources after staging validation exists.
