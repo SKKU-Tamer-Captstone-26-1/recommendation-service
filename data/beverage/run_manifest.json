@@ -1,0 +1,135 @@
+{
+  "run_id": "bev_collect_2026_05_22_mvp_expansion_002",
+  "previous_run_id": "bev_collect_2026_05_22_mvp_seed_001",
+  "agent": "beverage-data-collector",
+  "task_prompt": "prompts/beverage/beverage-data-collector-first-task.md plus user-requested expansion run",
+  "collected_at": "2026-05-22T18:30:00+09:00",
+  "market_focus": "Korea plus globally recognizable beverages likely to appear in bars, pubs, bottle shops, liquor shops, and restaurants",
+  "candidate_status_default": "needs_review",
+  "copyright_policy": "Paraphrased candidate summaries only; no full source text stored.",
+  "db_write_policy": {
+    "production_db_written": false,
+    "canonical_tables_written": false,
+    "staging_db_written": false,
+    "qdrant_written": false,
+    "reason": "No recommendation_staging beverage tables or safe beverage staging importer are present; expansion wrote candidate files only."
+  },
+  "required_reading_status": {
+    "read_present_paths": [
+      "AGENTS.md",
+      "README.md",
+      "docs/README.md",
+      "docs/architecture.md",
+      "docs/implementation-readiness.md",
+      ".agent/HARNESS.md",
+      ".agent/DOMAIN_BOUNDARIES.md",
+      ".codex/agents/beverage-data-collector.toml",
+      "docs/recommendation/map-read-model.md",
+      "docs/recommendation/recommendation-logic.md",
+      "docs/recommendation/sync-flow.md",
+      "docs/recommendation/beverage-catalog.md",
+      "docs/recommendation/vector-schema.md",
+      "docs/recommendation/survey-mapping.md",
+      "docs/database/erd.md",
+      "docs/database/migration-strategy.md",
+      "docs/assistant/assistant-architecture.md",
+      "docs/assistant/rag-policy.md",
+      "docs/assistant/prompt-contract.md",
+      "docs/assistant/response-schema.md",
+      "docs/assistant/evaluation-policy.md",
+      "docs/beverage/beverage-data-collection-report.md",
+      "docs/beverage/beverage-source-policy.md",
+      "docs/beverage/beverage-taxonomy.md",
+      "docs/beverage/beverage-staging-db-mapping.md"
+    ],
+    "missing_paths": [
+      {
+        "requested_path": "docs/recommendation/rag-knowledge-base.md",
+        "closest_equivalent_used": "docs/assistant/rag-policy.md",
+        "notes": "Repository has assistant RAG policy and beverage catalog docs, but no dedicated recommendation RAG knowledge-base schema document."
+      }
+    ]
+  },
+  "repository_inspection": {
+    "existing_staging_tables_found": false,
+    "existing_beverage_import_scripts_found": false,
+    "existing_beverage_candidate_files_found": true,
+    "existing_canonical_beverage_tables_found": [
+      "beverage_items",
+      "flavor_profiles",
+      "recommendation_vectors"
+    ],
+    "canonical_table_action": "not_written"
+  },
+  "counts_before_expansion": {
+    "catalog_candidates": 25,
+    "flavor_profile_candidates": 25,
+    "knowledge_candidates": 25,
+    "price_observation_candidates": 10,
+    "source_registry_rows": 36
+  },
+  "counts_added_this_run": {
+    "catalog_candidates": 95,
+    "flavor_profile_candidates": 95,
+    "knowledge_candidates": 95,
+    "price_observation_candidates": 1,
+    "source_registry_rows": 95,
+    "records_loaded_to_staging": 0
+  },
+  "counts": {
+    "catalog_candidates": 120,
+    "flavor_profile_candidates": 120,
+    "knowledge_candidates": 120,
+    "price_observation_candidates": 11,
+    "source_registry_rows": 131,
+    "records_loaded_to_staging": 0
+  },
+  "category_progress": {
+    "completed_categories": {
+      "beer": 10,
+      "brandy_cognac": 10,
+      "cocktail": 10,
+      "gin": 10,
+      "liqueur": 10,
+      "rum": 10,
+      "sake_shochu": 10,
+      "tequila_mezcal": 10,
+      "traditional_korean_alcohol": 10,
+      "vodka": 10,
+      "whiskey": 10,
+      "wine": 10
+    },
+    "partial_categories": {},
+    "not_started_categories": [],
+    "next_batch_plan": [
+      "Human-review the 120 candidates for duplicate aliases, Korea SKU ABV, and category/style normalization.",
+      "Add retailer or official suggested retail price observations only where dated source evidence is strong.",
+      "Implement local/dev recommendation_staging tables and dry-run importer before any DB load."
+    ]
+  },
+  "skipped_due_source_uncertainty": {
+    "catalog_candidates": 0,
+    "catalog_skip_details": [],
+    "price_observation_candidates": 94,
+    "price_notes": "Expansion prioritized source-backed catalog breadth. Only Kuro Kirishima had source-backed suggested retail pricing captured safely in this pass; other price records were skipped rather than using unstable live retailer prices."
+  },
+  "validation_expectations": {
+    "jsonl_files": [
+      "data/beverage/catalog_candidates.jsonl",
+      "data/beverage/flavor_profile_candidates.jsonl",
+      "data/beverage/knowledge_candidates.jsonl",
+      "data/beverage/price_observation_candidates.jsonl"
+    ],
+    "csv_files": [
+      "data/beverage/source_registry.csv"
+    ],
+    "staging_import_dry_run": "not_run_no_importer"
+  },
+  "known_gaps": [
+    "Flavor vectors are candidate estimates derived from source identity/style/ingredient language and must be human-reviewed before canonical seed import.",
+    "Many ABV and bottle-size fields vary by market; null values mean the exact Korea SKU must be verified before canonical import.",
+    "Price observations are rough historical or suggested-retail references only, not live offers or budget-filter truth.",
+    "No dedicated staging schema exists yet; see prompts/beverage/create-beverage-staging-schema.md.",
+    "Knowledge candidates are RAG/explanation candidates only and must not drive recommendation ranking."
+  ]
+}
