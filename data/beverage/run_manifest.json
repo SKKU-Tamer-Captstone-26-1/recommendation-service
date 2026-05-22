@@ -1,9 +1,9 @@
 {
-  "run_id": "bev_collect_2026_05_22_mvp_expansion_002",
-  "previous_run_id": "bev_collect_2026_05_22_mvp_seed_001",
+  "run_id": "bev_collect_2026_05_22_kr_price_003",
+  "previous_run_id": "bev_collect_2026_05_22_mvp_expansion_002",
   "agent": "beverage-data-collector",
-  "task_prompt": "prompts/beverage/beverage-data-collector-first-task.md plus user-requested expansion run",
-  "collected_at": "2026-05-22T18:30:00+09:00",
+  "task_prompt": "user-requested Korea KRW price-observation collection after mvp_expansion_002",
+  "collected_at": "2026-05-22T22:46:23+09:00",
   "market_focus": "Korea plus globally recognizable beverages likely to appear in bars, pubs, bottle shops, liquor shops, and restaurants",
   "candidate_status_default": "needs_review",
   "copyright_policy": "Paraphrased candidate summaries only; no full source text stored.",
@@ -68,7 +68,7 @@
     "price_observation_candidates": 10,
     "source_registry_rows": 36
   },
-  "counts_added_this_run": {
+  "counts_added_by_expansion_run": {
     "catalog_candidates": 95,
     "flavor_profile_candidates": 95,
     "knowledge_candidates": 95,
@@ -76,13 +76,32 @@
     "source_registry_rows": 95,
     "records_loaded_to_staging": 0
   },
-  "counts": {
+  "counts_before_kr_price_run": {
     "catalog_candidates": 120,
     "flavor_profile_candidates": 120,
     "knowledge_candidates": 120,
     "price_observation_candidates": 11,
-    "source_registry_rows": 131,
+    "source_registry_rows": 131
+  },
+  "counts_added_this_run": {
+    "catalog_candidates": 0,
+    "flavor_profile_candidates": 0,
+    "knowledge_candidates": 0,
+    "price_observation_candidates": 35,
+    "source_registry_rows": 35,
     "records_loaded_to_staging": 0
+  },
+  "counts": {
+    "catalog_candidates": 120,
+    "flavor_profile_candidates": 120,
+    "knowledge_candidates": 120,
+    "price_observation_candidates": 46,
+    "source_registry_rows": 166,
+    "records_loaded_to_staging": 0
+  },
+  "price_observation_market_counts": {
+    "KR_KRW": 36,
+    "non_kr_legacy_observations": 10
   },
   "category_progress": {
     "completed_categories": {
@@ -103,15 +122,15 @@
     "not_started_categories": [],
     "next_batch_plan": [
       "Human-review the 120 candidates for duplicate aliases, Korea SKU ABV, and category/style normalization.",
-      "Add retailer or official suggested retail price observations only where dated source evidence is strong.",
+      "Review KRW price observations for SKU/package-size normalization before any staging or UI use.",
       "Implement local/dev recommendation_staging tables and dry-run importer before any DB load."
     ]
   },
   "skipped_due_source_uncertainty": {
     "catalog_candidates": 0,
     "catalog_skip_details": [],
-    "price_observation_candidates": 94,
-    "price_notes": "Expansion prioritized source-backed catalog breadth. Only Kuro Kirishima had source-backed suggested retail pricing captured safely in this pass; other price records were skipped rather than using unstable live retailer prices."
+    "price_observation_candidates": 0,
+    "price_notes": "This KRW price pass added only source-backed Korea retailer/pickup observations and kept them explicitly non-live and non-canonical. Products without a clear source-backed KRW listing were not added."
   },
   "validation_expectations": {
     "jsonl_files": [
@@ -128,7 +147,7 @@
   "known_gaps": [
     "Flavor vectors are candidate estimates derived from source identity/style/ingredient language and must be human-reviewed before canonical seed import.",
     "Many ABV and bottle-size fields vary by market; null values mean the exact Korea SKU must be verified before canonical import.",
-    "Price observations are rough historical or suggested-retail references only, not live offers or budget-filter truth.",
+    "KRW price observations are rough point-in-time Korea retailer/pickup references only, not live offers, inventory truth, or budget-filter truth.",
     "No dedicated staging schema exists yet; see prompts/beverage/create-beverage-staging-schema.md.",
     "Knowledge candidates are RAG/explanation candidates only and must not drive recommendation ranking."
   ]

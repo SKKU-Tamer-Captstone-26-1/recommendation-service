@@ -31,15 +31,15 @@ data/beverage/knowledge_candidates.jsonl
 data/beverage/price_observation_candidates.jsonl
 ```
 
-Current candidate counts from `bev_collect_2026_05_22_mvp_expansion_002`:
+Current candidate counts from `bev_collect_2026_05_22_kr_price_003`:
 
 | Lane | Count |
 |---|---:|
 | catalog candidates | 120 |
 | flavor profile candidates | 120 |
 | knowledge candidates | 120 |
-| price observations | 11 |
-| source registry rows | 131 |
+| price observations | 46 |
+| source registry rows | 166 |
 
 ## Required Sequence
 
@@ -74,6 +74,8 @@ The importer must verify:
 - Flavor vectors contain only values from 0.0 to 1.0.
 - Flavor, knowledge, and price records reference existing catalog candidates.
 - Price observations with retailer sources are marked as non-live observations.
+- KRW price observations remain reviewer-facing point-in-time records, not
+  inventory truth or strict budget-filter input.
 - Source URLs are preserved.
 
 ## Output
