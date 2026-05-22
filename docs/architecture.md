@@ -64,6 +64,7 @@ Client
   -> gateway-service
       -> auth-service
       -> survey-service
+      -> assistant-service
       -> recommendation-service
 ```
 
@@ -78,7 +79,13 @@ Service ownership:
 | `auth-service` | OAuth, users, JWT issuing, identity lifecycle | Surveys, recommendations |
 | `gateway-service` | Public routing, request validation, edge concerns | Business state |
 | `survey-service` | Survey schemas, raw answers, answer revisions | Taste vectors, recommendations |
+| `assistant-service` | App-domain conversational orchestration and grounded natural-language answers | Auth, raw survey truth, recommendation ranking, canonical place data |
 | `recommendation-service` | Derived taste profiles, vectors, scoring metadata, recommendation logs | Auth, raw survey truth |
+
+Assistant architecture is documented in `assistant/assistant-architecture.md`.
+The assistant MUST call `recommendation-service` for deterministic
+recommendation facts. RAG and LLM generation MUST NOT replace recommendation
+ranking.
 
 ## Storage Architecture
 
@@ -147,6 +154,31 @@ sequenceDiagram
     Recs->>PG: Log request and results
     Recs-->>Client: Explainable recommendations
 ```
+
+## High-Level Assistant Flow
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Gateway as gateway-service
+    participant Assistant as assistant-service
+    participant Recs as recommendation-service
+    participant LLM
+
+    Client->>Gateway: Ask assistant with JWT
+    Gateway->>Assistant: Forward authenticated context
+    Assistant->>Assistant: Classify app-domain intent
+    Assistant->>Recs: Fetch profile status and recommendation facts
+    Recs-->>Assistant: Scores, reason codes, cards, source metadata
+    Assistant->>Assistant: Build grounded context
+    Assistant->>LLM: Generate answer from grounded facts only
+    LLM-->>Assistant: Natural-language draft
+    Assistant->>Assistant: Verify claims against retrieved facts
+    Assistant-->>Client: Answer, cards, refusal state, source metadata
+```
+
+If recommendation-service returns no usable facts, assistant-service MUST refuse
+or return an insufficient-data answer.
 
 ## Deployment Shape
 
