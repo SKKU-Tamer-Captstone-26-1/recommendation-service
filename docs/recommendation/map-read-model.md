@@ -87,6 +87,8 @@ venue_snapshots
 venue_menu_snapshots
 venue_inventory_snapshots
 venue_price_snapshots
+map_snapshot_sync_cursors
+map_snapshot_sync_events
 ```
 
 These tables MUST include:
@@ -97,6 +99,10 @@ These tables MUST include:
 - sync timestamp
 - freshness or expiry metadata
 - confidence metadata when source data is uncertain
+
+`map_snapshot_sync_*` tables store recommendation-service sync cursors, event
+payloads, retry state, and idempotency keys. They are not canonical map/place
+tables.
 
 ## Freshness Policy
 
@@ -173,7 +179,6 @@ options:
 nearest_reasonable
 best_price
 balanced_best
-high_taste_match_farther
 ```
 
 Scoring inputs may include:
@@ -190,6 +195,10 @@ Scoring inputs may include:
 
 Do not return several near-identical top-scoring venues when the product request
 expects meaningful alternatives.
+
+MVP selected-beverage venue recommendations use straight-line distance labeled
+as `distance_strategy = straight_line_mvp`. Route optimization and transit
+estimates require a later approved slice.
 
 ## Rebuild Strategy
 

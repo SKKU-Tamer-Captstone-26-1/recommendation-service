@@ -72,3 +72,22 @@ class InteractionEventType(StrEnum):
     SAVE = "save"
     DISMISS = "dismiss"
     DETAIL_VIEW = "detail_view"
+
+
+class VenueOptionType(StrEnum):
+    NEAREST_REASONABLE = "nearest_reasonable"
+    BEST_PRICE = "best_price"
+    BALANCED_BEST = "balanced_best"
+
+
+class VenueAvailabilityStatus(StrEnum):
+    AVAILABLE = "available"
+    LIKELY_AVAILABLE = "likely_available"
+    UNKNOWN = "unknown"
+    UNAVAILABLE = "unavailable"
+
+
+class VenueFreshnessStatus(StrEnum):
+    FRESH = "fresh"
+    STALE = "stale"
+    EXPIRED = "expired"

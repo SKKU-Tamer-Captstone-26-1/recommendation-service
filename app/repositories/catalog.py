@@ -1,10 +1,17 @@
 import uuid
 from dataclasses import dataclass
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
-from app.models.catalog import BeverageItem, FlavorProfile
+from app.models.catalog import (
+    BeverageItem,
+    FlavorProfile,
+    VenueInventorySnapshot,
+    VenueMenuSnapshot,
+    VenuePriceSnapshot,
+    VenueSnapshot,
+)
 from app.models.enums import FlavorProfileOwnerType, VectorOwnerType
 from app.models.vector import RecommendationVector
 
@@ -14,6 +21,14 @@ class BeverageVectorCandidate:
     beverage: BeverageItem
     vector: RecommendationVector
     flavor_profile: FlavorProfile | None
+
+
+@dataclass(frozen=True)
+class VenueSnapshotCandidate:
+    venue: VenueSnapshot
+    menu: VenueMenuSnapshot | None
+    inventory: VenueInventorySnapshot | None
+    price: VenuePriceSnapshot | None
 
 
 class CatalogRepository:
@@ -55,4 +70,60 @@ class CatalogRepository:
                 flavor_profile=flavor_profile,
             )
             for beverage, vector, flavor_profile in rows
+        )
+
+    def get_active_beverage_item(self, beverage_id: uuid.UUID) -> BeverageItem | None:
+        return self._session.scalar(
+            select(BeverageItem).where(
+                BeverageItem.id == beverage_id,
+                BeverageItem.active.is_(True),
+            ),
+        )
+
+    def list_selected_beverage_venue_candidates(
+        self,
+        *,
+        beverage_item_id: uuid.UUID,
+    ) -> tuple[VenueSnapshotCandidate, ...]:
+        menu_join = and_(
+            VenueMenuSnapshot.venue_snapshot_id == VenueSnapshot.id,
+            VenueMenuSnapshot.beverage_item_id == beverage_item_id,
+        )
+        inventory_join = and_(
+            VenueInventorySnapshot.venue_snapshot_id == VenueSnapshot.id,
+            VenueInventorySnapshot.beverage_item_id == beverage_item_id,
+        )
+        price_join = and_(
+            VenuePriceSnapshot.venue_snapshot_id == VenueSnapshot.id,
+            VenuePriceSnapshot.beverage_item_id == beverage_item_id,
+        )
+        statement = (
+            select(
+                VenueSnapshot,
+                VenueMenuSnapshot,
+                VenueInventorySnapshot,
+                VenuePriceSnapshot,
+            )
+            .outerjoin(VenueMenuSnapshot, menu_join)
+            .outerjoin(VenueInventorySnapshot, inventory_join)
+            .outerjoin(VenuePriceSnapshot, price_join)
+            .where(
+                or_(
+                    VenueMenuSnapshot.id.is_not(None),
+                    VenueInventorySnapshot.id.is_not(None),
+                    VenuePriceSnapshot.id.is_not(None),
+                ),
+            )
+            .order_by(VenueSnapshot.place_id, VenueSnapshot.place_revision)
+        )
+
+        rows = self._session.execute(statement).all()
+        return tuple(
+            VenueSnapshotCandidate(
+                venue=venue,
+                menu=menu,
+                inventory=inventory,
+                price=price,
+            )
+            for venue, menu, inventory, price in rows
         )
