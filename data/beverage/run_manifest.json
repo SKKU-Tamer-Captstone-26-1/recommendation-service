@@ -1,9 +1,9 @@
 {
-  "run_id": "bev_collect_2026_05_22_kr_price_004",
-  "previous_run_id": "bev_collect_2026_05_22_kr_price_003",
+  "run_id": "bev_collect_2026_05_23_kr_price_005",
+  "previous_run_id": "bev_collect_2026_05_22_kr_price_004",
   "agent": "beverage-data-collector",
-  "task_prompt": "user-requested broad Korea KRW price-observation expansion after kr_price_003",
-  "collected_at": "2026-05-22T23:39:00+09:00",
+  "task_prompt": "user-requested follow-up Korea KRW price-observation expansion and DB-readiness preparation after kr_price_004",
+  "collected_at": "2026-05-23T13:13:00+09:00",
   "market_focus": "Korea plus globally recognizable beverages likely to appear in bars, pubs, bottle shops, liquor shops, and restaurants",
   "candidate_status_default": "needs_review",
   "copyright_policy": "Paraphrased candidate summaries only; no full source text stored.",
@@ -106,16 +106,46 @@
     "source_registry_rows": 43,
     "records_loaded_to_staging": 0
   },
+  "counts_before_kr_price_run_005": {
+    "catalog_candidates": 120,
+    "flavor_profile_candidates": 120,
+    "knowledge_candidates": 120,
+    "price_observation_candidates": 79,
+    "legacy_non_kr_price_observation_candidates": 10,
+    "source_registry_rows": 210
+  },
+  "counts_added_by_kr_price_run_005": {
+    "catalog_candidates": 0,
+    "flavor_profile_candidates": 0,
+    "knowledge_candidates": 0,
+    "price_observation_candidates": 11,
+    "source_registry_rows": 11,
+    "records_loaded_to_staging": 0
+  },
   "counts": {
     "catalog_candidates": 120,
     "flavor_profile_candidates": 120,
     "knowledge_candidates": 120,
-    "price_observation_candidates": 89,
-    "source_registry_rows": 209,
+    "price_observation_candidates": 90,
+    "legacy_non_kr_price_observation_candidates": 10,
+    "source_registry_rows": 221,
     "records_loaded_to_staging": 0
   },
+  "post_collection_cleanup": {
+    "cleaned_at": "2026-05-23T00:00:00+09:00",
+    "main_price_file_policy": "KRW-only Korea price observations for dry-run validation",
+    "legacy_non_kr_price_file": "data/beverage/price_observation_legacy_non_kr_candidates.jsonl",
+    "legacy_non_kr_price_observation_candidates": 10,
+    "source_registry_rows_added": 1,
+    "notes": [
+      "Moved GBP/USD/JPY legacy price observations out of the Korea/KRW dry-run path.",
+      "Added Dailyshot item-page package-size evidence for Stoli Vodka while preserving the original search-result price observation."
+    ]
+  },
   "price_observation_market_counts": {
-    "KR_KRW": 79,
+    "KR_KRW": 90,
+    "unique_kr_priced_beverages": 89,
+    "unpriced_catalog_candidates": 31,
     "non_kr_legacy_observations": 10
   },
   "category_progress": {
@@ -138,14 +168,15 @@
     "next_batch_plan": [
       "Human-review the 120 candidates for duplicate aliases, Korea SKU ABV, and category/style normalization.",
       "Review KRW price observations for SKU/package-size normalization, especially lower-confidence search/review-card rows, before any staging or UI use.",
-      "Implement local/dev recommendation_staging tables and dry-run importer before any DB load."
+      "Implement local/dev recommendation_staging tables and dry-run importer before any DB load.",
+      "Keep cocktail and venue/menu price evidence out of beverage price observations unless map/place ownership and snapshot semantics are explicitly modeled."
     ]
   },
   "skipped_due_source_uncertainty": {
     "catalog_candidates": 0,
     "catalog_skip_details": [],
     "price_observation_candidates": 0,
-    "price_notes": "This KRW price pass added only source-backed Korea retailer/pickup, search-result, review-card, package, or overseas-direct KRW observations and kept them explicitly non-live and non-canonical. Products without visible source-backed KRW evidence were not added."
+    "price_notes": "The 2026-05-23 follow-up added 11 source-backed Korea KRW observations for existing catalog candidates and kept them explicitly non-live and non-canonical. Venue/menu cocktail prices were intentionally left out because live menu and place pricing belongs to map/place ownership and requires snapshot semantics."
   },
   "validation_expectations": {
     "jsonl_files": [
@@ -153,6 +184,9 @@
       "data/beverage/flavor_profile_candidates.jsonl",
       "data/beverage/knowledge_candidates.jsonl",
       "data/beverage/price_observation_candidates.jsonl"
+    ],
+    "legacy_jsonl_files": [
+      "data/beverage/price_observation_legacy_non_kr_candidates.jsonl"
     ],
     "csv_files": [
       "data/beverage/source_registry.csv"
@@ -163,6 +197,7 @@
     "Flavor vectors are candidate estimates derived from source identity/style/ingredient language and must be human-reviewed before canonical seed import.",
     "Many ABV and bottle-size fields vary by market; null values mean the exact Korea SKU must be verified before canonical import.",
     "KRW price observations are rough point-in-time Korea retailer/pickup references only, not live offers, inventory truth, or budget-filter truth.",
+    "Cocktail and venue/menu prices remain intentionally absent from beverage price observations until map/place snapshot ownership is modeled.",
     "No dedicated staging schema exists yet; see prompts/beverage/create-beverage-staging-schema.md.",
     "Knowledge candidates are RAG/explanation candidates only and must not drive recommendation ranking."
   ]
