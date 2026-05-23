@@ -5,19 +5,23 @@
 Previous KRW run ID:
 
 ```text
-bev_collect_2026_05_22_kr_price_003
+bev_collect_2026_05_22_kr_price_004
 ```
 
 Latest run ID:
 
 ```text
-bev_collect_2026_05_22_kr_price_004
+bev_collect_2026_05_23_kr_price_005
 ```
 
-The latest price-focused run followed the first KRW price pass and added broader
-Korea-focused KRW price observations. It updated candidate files only. It did
-not write production DB, canonical beverage tables, map/admin/auth/survey DBs,
-staging DB, or Qdrant.
+The latest price-focused run followed the broader KRW pass and added 11 more
+source-backed Korea KRW price observations for existing catalog candidates. It
+updated candidate files only. It did not write production DB, canonical beverage
+tables, map/admin/auth/survey DBs, staging DB, or Qdrant.
+
+Post-run cleanup on May 23, 2026 split legacy non-KRW price observations out of
+the Korea/KRW dry-run path. The main price observation file is now KRW-focused,
+and legacy GBP/USD/JPY observations are preserved separately.
 
 All automatic records remain:
 
@@ -32,8 +36,9 @@ needs_review
 | Structured catalog candidates | 120 | 0 | 120 |
 | Flavor profile candidates | 120 | 0 | 120 |
 | Knowledge/RAG candidates | 120 | 0 | 120 |
-| Price observation candidates | 46 | 43 | 89 |
-| Source registry rows | 166 | 43 | 209 |
+| KRW price observation candidates | 79 | 11 | 90 |
+| Legacy non-KRW price observation candidates | 10 | 0 | 10 |
+| Source registry rows | 210 | 11 | 221 |
 | Staging loaded records | 0 | 0 | 0 |
 
 ## Category Coverage
@@ -64,9 +69,17 @@ candidate and Korean knowledge candidate.
 
 The KRW price passes focused on source-backed Korea retailer/pickup observations
 for products already present in the candidate catalog. The first KRW pass added
-35 records; the latest broad pass added 43 more. The data now has 79 KRW
-observations out of 89 total price records. All KRW records remain explicitly
-non-live and non-canonical.
+35 records; the broad pass added 43 more; the May 23 follow-up added 11 more
+source-backed observations. The data now has 90 KRW observations in the main
+price observation file, with 10 legacy non-KRW records preserved in
+`price_observation_legacy_non_kr_candidates.jsonl`. All KRW records remain
+explicitly non-live and non-canonical.
+
+Unique KRW price coverage is now 89 of 120 catalog candidates. The remaining 31
+unpriced catalog candidates are concentrated in cocktails, wine, rum,
+sake/shochu, brandy/cognac, tequila/mezcal, traditional Korean alcohol, and
+vodka. Cocktail and venue/menu price evidence remains intentionally excluded
+until map/place-owned snapshot semantics are modeled.
 
 ## Key Decisions
 
@@ -109,6 +122,10 @@ Some lower-confidence rows use Dailyshot search-result or review-card pages when
 a direct item page was not quickly available; those rows require SKU and package
 review before any importer use.
 
+The May 23 follow-up also corrected source/product URL alignment while adding
+rows. For example, Kihya item URLs were checked against visible product titles
+before use rather than trusting stale item IDs from earlier notes.
+
 No Kakao Local/Map API source was used.
 
 ## Skipped Due Source Uncertainty
@@ -116,7 +133,31 @@ No Kakao Local/Map API source was used.
 | Area | Count | Reason |
 |---|---:|---|
 | Catalog candidates | 0 | No duplicate/source-uncertain catalog candidate was intentionally added. |
-| Price observations | 0 in this KRW pass | Only visible source-backed KRW observations were added; products without clear Korea price evidence were left unchanged. |
+| Price observations | 0 in this follow-up | Only visible source-backed KRW observations were added; products without clear Korea price evidence were left unchanged. Cocktail and venue/menu prices were intentionally skipped because live menu pricing belongs to map/place ownership. |
+
+## Dry-Run Cleanup
+
+The Korea/KRW dry-run validator now reads:
+
+```text
+data/beverage/price_observation_candidates.jsonl
+```
+
+as the KRW-focused price candidate file. Legacy non-KRW observations are retained
+at:
+
+```text
+data/beverage/price_observation_legacy_non_kr_candidates.jsonl
+```
+
+The Stoli Vodka row now preserves the original Dailyshot search-result price
+observation and adds a Dailyshot item-page source for 700ml package-size
+evidence. This remains reviewer-facing evidence only, not canonical price truth.
+
+The final warning cleanup aligned two tequila/mezcal candidate IDs with their
+slugs and normalized cocktail knowledge candidate `document_type` values. After
+the May 23 follow-up, the Korea/KRW dry-run reports 671 accepted rows, 0
+warnings, and 0 rejected rows.
 
 ## Current Usefulness
 
@@ -145,6 +186,7 @@ This batch is not yet sufficient for:
 | Flavor values are candidate estimates | Human review and deterministic import validation required |
 | KRW price data is point-in-time retailer data | Normalize package size, SKU, and freshness before UI or scoring use |
 | Some KRW sources are search-result or review-card observations | Treat as low-confidence display evidence until direct item page or receipt/source proof is reviewed |
+| Cocktail and venue/menu prices are absent | Model map/place-owned snapshot semantics before collecting live menu prices |
 | Cocktail ABV depends on recipe and dilution | Keep cocktail ABV null until normalized recipe model exists |
 | Staging schema is absent | Implement `recommendation_staging` before DB import |
 
