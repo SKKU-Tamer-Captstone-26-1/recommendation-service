@@ -19,6 +19,8 @@ service RecommendationService {
   rpc GetProfileStatus(GetProfileStatusRequest) returns (GetProfileStatusResponse);
   rpc GetBeverageRecommendations(GetBeverageRecommendationsRequest)
       returns (GetBeverageRecommendationsResponse);
+  rpc GetVenueRecommendations(GetVenueRecommendationsRequest)
+      returns (GetVenueRecommendationsResponse);
   rpc RecordRecommendationEvent(RecordRecommendationEventRequest)
       returns (RecordRecommendationEventResponse);
 }
@@ -45,6 +47,28 @@ enum RecommendationEventType {
   RECOMMENDATION_EVENT_TYPE_SAVE = 3;
   RECOMMENDATION_EVENT_TYPE_DISMISS = 4;
   RECOMMENDATION_EVENT_TYPE_DETAIL_VIEW = 5;
+}
+
+enum VenueOptionType {
+  VENUE_OPTION_TYPE_UNSPECIFIED = 0;
+  VENUE_OPTION_TYPE_NEAREST_REASONABLE = 1;
+  VENUE_OPTION_TYPE_BEST_PRICE = 2;
+  VENUE_OPTION_TYPE_BALANCED_BEST = 3;
+}
+
+enum VenueAvailabilityStatus {
+  VENUE_AVAILABILITY_STATUS_UNSPECIFIED = 0;
+  VENUE_AVAILABILITY_STATUS_AVAILABLE = 1;
+  VENUE_AVAILABILITY_STATUS_LIKELY_AVAILABLE = 2;
+  VENUE_AVAILABILITY_STATUS_UNKNOWN = 3;
+  VENUE_AVAILABILITY_STATUS_UNAVAILABLE = 4;
+}
+
+enum VenueFreshnessStatus {
+  VENUE_FRESHNESS_STATUS_UNSPECIFIED = 0;
+  VENUE_FRESHNESS_STATUS_FRESH = 1;
+  VENUE_FRESHNESS_STATUS_STALE = 2;
+  VENUE_FRESHNESS_STATUS_EXPIRED = 3;
 }
 
 message GetProfileStatusRequest {}
@@ -81,6 +105,40 @@ message GetBeverageRecommendationsResponse {
   ProfileStatus profile_status = 2;
   int32 profile_revision = 3;
   repeated BeverageRecommendation recommendations = 4;
+}
+
+message GetVenueRecommendationsRequest {
+  string selected_beverage_id = 1;
+  double lat = 2;
+  double lng = 3;
+  int32 radius_m = 4;
+  int32 limit = 5;
+  BudgetMode budget_mode = 6;
+}
+
+message VenueRecommendation {
+  int32 rank = 1;
+  string result_id = 2;
+  string place_id = 3;
+  string name = 4;
+  string place_type = 5;
+  string address = 6;
+  VenueOptionType option_type = 7;
+  double distance_m = 8;
+  optional int32 price_krw = 9;
+  VenueAvailabilityStatus availability_status = 10;
+  VenueFreshnessStatus freshness_status = 11;
+  double score = 12;
+  repeated string reason_codes = 13;
+  string explanation = 14;
+  google.protobuf.Struct metadata = 15;
+}
+
+message GetVenueRecommendationsResponse {
+  string request_id = 1;
+  ProfileStatus profile_status = 2;
+  int32 profile_revision = 3;
+  repeated VenueRecommendation recommendations = 4;
 }
 
 message RecordRecommendationEventRequest {

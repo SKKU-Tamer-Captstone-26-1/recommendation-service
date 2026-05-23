@@ -22,6 +22,15 @@ class RecommendationServiceStub:
                 recommendation__pb2.GetBeverageRecommendationsResponse.FromString
             ),
         )
+        self.GetVenueRecommendations = channel.unary_unary(
+            "/ontheblock.recommendation.v1.RecommendationService/GetVenueRecommendations",
+            request_serializer=(
+                recommendation__pb2.GetVenueRecommendationsRequest.SerializeToString
+            ),
+            response_deserializer=(
+                recommendation__pb2.GetVenueRecommendationsResponse.FromString
+            ),
+        )
         self.RecordRecommendationEvent = channel.unary_unary(
             "/ontheblock.recommendation.v1.RecommendationService/RecordRecommendationEvent",
             request_serializer=recommendation__pb2.RecordRecommendationEventRequest.SerializeToString,
@@ -34,6 +43,9 @@ class RecommendationServiceServicer:
         context.abort(grpc.StatusCode.UNIMPLEMENTED, "method not implemented")
 
     def GetBeverageRecommendations(self, request, context):
+        context.abort(grpc.StatusCode.UNIMPLEMENTED, "method not implemented")
+
+    def GetVenueRecommendations(self, request, context):
         context.abort(grpc.StatusCode.UNIMPLEMENTED, "method not implemented")
 
     def RecordRecommendationEvent(self, request, context):
@@ -54,6 +66,15 @@ def add_RecommendationServiceServicer_to_server(servicer, server):
             ),
             response_serializer=(
                 recommendation__pb2.GetBeverageRecommendationsResponse.SerializeToString
+            ),
+        ),
+        "GetVenueRecommendations": grpc.unary_unary_rpc_method_handler(
+            servicer.GetVenueRecommendations,
+            request_deserializer=(
+                recommendation__pb2.GetVenueRecommendationsRequest.FromString
+            ),
+            response_serializer=(
+                recommendation__pb2.GetVenueRecommendationsResponse.SerializeToString
             ),
         ),
         "RecordRecommendationEvent": grpc.unary_unary_rpc_method_handler(

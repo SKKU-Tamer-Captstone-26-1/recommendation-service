@@ -88,6 +88,7 @@ slice. Current service shape:
 service RecommendationService {
   rpc GetProfileStatus(GetProfileStatusRequest) returns (GetProfileStatusResponse);
   rpc GetBeverageRecommendations(GetBeverageRecommendationsRequest) returns (GetBeverageRecommendationsResponse);
+  rpc GetVenueRecommendations(GetVenueRecommendationsRequest) returns (GetVenueRecommendationsResponse);
   rpc RecordRecommendationEvent(RecordRecommendationEventRequest) returns (RecordRecommendationEventResponse);
 }
 ```
@@ -109,8 +110,9 @@ Assistant API drafts are documented separately in
 `RecommendationService` unless a future architecture decision explicitly places
 assistant runtime inside this repository.
 
-`GetVenueRecommendations` remains a planned RPC and must not be implemented
-until map/place snapshots and freshness semantics are populated.
+`GetVenueRecommendations` is implemented only for selected-beverage venue
+ranking from map/place read-model snapshots. It must not read or mutate
+map-service/place-service databases directly.
 
 Internal operations SHOULD be separated from public recommendation reads:
 
@@ -225,36 +227,41 @@ Request fields:
 | `lng` | yes | Longitude |
 | `radius_m` | no | Search radius in meters |
 | `limit` | no | Result count |
-| `selected_beverage_id` | no | Beverage the user wants to buy or drink |
-| `budget_mode` | no | `strict` or `soft` |
+| `selected_beverage_id` | yes | Active canonical beverage the user wants to buy or drink |
+| `budget_mode` | no | `BUDGET_MODE_SOFT` or `BUDGET_MODE_STRICT` |
 
 Response:
 
 ```json
 {
   "request_id": "rec_req_venue_123",
+  "profile_status": "PROFILE_STATUS_ACTIVE",
   "profile_revision": 4,
-  "results": [
+  "recommendations": [
     {
       "rank": 1,
-      "target_type": "venue",
-      "target_id": "place_123",
+      "result_id": "rec_result_456",
+      "place_id": "place_123",
       "name": "Example Bottle Shop",
+      "place_type": "bottle_shop",
       "option_type": "balanced_best",
       "distance_m": 720,
-      "availability_status": "likely_available",
       "price_krw": 42000,
-      "scores": {
-        "similarity": 0.82,
-        "final": 0.89
-      },
-      "reason_codes": ["NEARBY_VENUE", "WITHIN_BUDGET"],
-      "source_revisions": {
-        "place_revision": "place_rev_12",
-        "inventory_revision": "inv_rev_8",
-        "price_revision": "price_rev_3"
-      },
-      "freshness_status": "fresh"
+      "availability_status": "VENUE_AVAILABILITY_STATUS_LIKELY_AVAILABLE",
+      "freshness_status": "VENUE_FRESHNESS_STATUS_FRESH",
+      "score": 0.89,
+      "reason_codes": ["NEARBY_VENUE", "WITHIN_BUDGET", "BALANCED_BEST"],
+      "explanation": "Example Bottle Shop is recommended because: nearby venue, within budget, balanced best.",
+      "metadata": {
+        "score_breakdown": {},
+        "source": {
+          "place_revision": "place_rev_12",
+          "menu_revision": "menu_rev_7",
+          "inventory_revision": "inv_rev_8",
+          "price_revision": "price_rev_3",
+          "distance_strategy": "straight_line_mvp"
+        }
+      }
     }
   ]
 }
@@ -262,6 +269,14 @@ Response:
 
 Venue results MUST be generated from map/place read-model snapshots documented
 in `../recommendation/map-read-model.md`.
+
+Supported venue option types:
+
+```text
+VENUE_OPTION_TYPE_NEAREST_REASONABLE
+VENUE_OPTION_TYPE_BEST_PRICE
+VENUE_OPTION_TYPE_BALANCED_BEST
+```
 
 ### `RecommendationService.RecordRecommendationEvent`
 
