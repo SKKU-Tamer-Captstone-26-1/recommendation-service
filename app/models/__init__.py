@@ -19,13 +19,29 @@ from app.models.recommendation_event import (
     RecommendationRequest,
     RecommendationResult,
 )
+from app.models.staging import (
+    BeverageCandidateImportError,
+    BeverageCatalogCandidate,
+    BeverageCollectionRun,
+    BeverageFlavorProfileCandidate,
+    BeverageKnowledgeCandidate,
+    BeveragePriceObservationCandidate,
+    BeverageSourceRef,
+)
 from app.models.sync import DeadLetterEvent, SurveySyncCursor, SurveySyncEvent
 from app.models.vector import QdrantPoint, RecommendationVector
 from app.models.versioning import MapperVersion, ScoringConfig, VectorSchemaVersion
 
 __all__ = [
     "Base",
+    "BeverageCandidateImportError",
+    "BeverageCatalogCandidate",
+    "BeverageCollectionRun",
+    "BeverageFlavorProfileCandidate",
     "BeverageItem",
+    "BeverageKnowledgeCandidate",
+    "BeveragePriceObservationCandidate",
+    "BeverageSourceRef",
     "DeadLetterEvent",
     "FlavorProfile",
     "MapperVersion",

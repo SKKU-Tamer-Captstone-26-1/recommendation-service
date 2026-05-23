@@ -75,6 +75,16 @@ Derived rebuildable state:
 - Qdrant collections
 - Qdrant point payloads
 
+Review-only staging state:
+
+- beverage collection runs
+- beverage catalog candidates
+- beverage flavor profile candidates
+- beverage knowledge candidates
+- beverage KRW price observation candidates
+- beverage source refs
+- beverage candidate import errors
+
 ## Implementation Readiness Rules
 
 Before writing migrations:
@@ -111,6 +121,21 @@ Rules:
 
 Detailed beverage catalog rules are documented in
 `../recommendation/beverage-catalog.md`.
+
+## Beverage Candidate Staging
+
+Candidate artifacts collected under `data/beverage/` are loaded into
+`recommendation_staging` before any canonical promotion.
+
+Rules:
+
+- Staging tables are review evidence, not canonical recommendation data.
+- Staging import preserves raw JSON/CSV rows for reproducibility.
+- Automated imports keep candidate status as `needs_review`.
+- Only a fixed reviewed seed subset may be promoted into canonical
+  `beverage_items`, `flavor_profiles`, and `recommendation_vectors`.
+- Candidate KRW price observations are not live offers, inventory truth, or
+  strict budget-filter evidence.
 
 ## ERD
 

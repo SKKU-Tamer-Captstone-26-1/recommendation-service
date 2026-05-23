@@ -5,8 +5,9 @@
 This document maps the conceptual beverage collection staging tables requested by
 the first beverage data collector task to the current repository state.
 
-No staging tables or DB-writing importer were found in this repository at
-collection time.
+Staging tables and a DB-writing importer now exist for review-only candidate
+loading. The importer writes to `recommendation_staging` first and promotes only
+the fixed MVP seed subset into canonical beverage catalog/vector tables.
 
 A local dry-run validator now exists:
 
@@ -42,7 +43,7 @@ Found canonical recommendation-owned tables:
 - `scoring_configs`
 - `qdrant_points`
 
-Found no staging equivalents for:
+Found staging equivalents for:
 
 - `recommendation_staging.beverage_collection_runs`
 - `recommendation_staging.beverage_catalog_candidates`
@@ -50,6 +51,7 @@ Found no staging equivalents for:
 - `recommendation_staging.beverage_knowledge_candidates`
 - `recommendation_staging.beverage_price_observation_candidates`
 - `recommendation_staging.beverage_source_refs`
+- `recommendation_staging.beverage_candidate_import_errors`
 
 Found candidate validation tooling:
 
@@ -59,27 +61,28 @@ Found candidate validation tooling:
 
 | Conceptual staging table | Current actual table | Current action |
 |---|---|---|
-| `recommendation_staging.beverage_collection_runs` | none | Create staging schema in follow-up task |
-| `recommendation_staging.beverage_catalog_candidates` | none | Keep candidate records in `data/beverage/catalog_candidates.jsonl` |
-| `recommendation_staging.beverage_flavor_profile_candidates` | none | Keep candidate records in `data/beverage/flavor_profile_candidates.jsonl` |
-| `recommendation_staging.beverage_knowledge_candidates` | none | Keep candidate records in `data/beverage/knowledge_candidates.jsonl` |
-| `recommendation_staging.beverage_price_observation_candidates` | none | Keep candidate records in `data/beverage/price_observation_candidates.jsonl` |
-| `recommendation_staging.beverage_source_refs` | none | Keep source registry in `data/beverage/source_registry.csv` |
+| `recommendation_staging.beverage_collection_runs` | implemented | Store run manifest and import status |
+| `recommendation_staging.beverage_catalog_candidates` | implemented | Store catalog candidate raw JSON |
+| `recommendation_staging.beverage_flavor_profile_candidates` | implemented | Store flavor candidate raw JSON |
+| `recommendation_staging.beverage_knowledge_candidates` | implemented | Store knowledge candidate raw JSON |
+| `recommendation_staging.beverage_price_observation_candidates` | implemented | Store KRW price observation raw JSON |
+| `recommendation_staging.beverage_source_refs` | implemented | Store source registry rows |
 
 ## Canonical Table Non-Write Decision
 
-The first batch was not inserted into canonical tables.
+The full candidate batch must not be inserted into canonical tables.
 
 Reason:
 
-- Candidate records are not human-reviewed.
-- No staging schema exists.
-- Dry-run validation exists, but it does not import to DB.
-- The task explicitly forbids canonical beverage writes when staging is missing.
+- Most candidate records are not human-reviewed.
+- The dry-run validator only proves shape/linkage, not curation approval.
+- Candidate price observations are not live price truth.
+- Only the fixed MVP seed subset from `docs/plans/002.md` is eligible for
+  canonical promotion.
 
-## Desired Staging Behavior
+## Current Staging Behavior
 
-The follow-up staging implementation should support:
+The staging importer supports:
 
 - ingesting JSONL/CSV candidate files into `recommendation_staging`
 - validating schema shape before insert
@@ -87,8 +90,8 @@ The follow-up staging implementation should support:
 - preserving source URLs and retrieved dates
 - storing raw candidate JSON for reproducibility
 - using the dry-run report before any staging write
-- never writing canonical `beverage_items`, `flavor_profiles`, or
-  `recommendation_vectors`
+- promoting only the fixed reviewed MVP seed subset into canonical
+  `beverage_items`, `flavor_profiles`, and `recommendation_vectors`
 
 ## Dry-Run Report Status
 

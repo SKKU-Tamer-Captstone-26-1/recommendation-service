@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package ontheblock.recommendation.v1;
+
+option java_package = "com.ontheblock.recommendation.v1";
+option java_multiple_files = true;
+option go_package = "github.com/ontheblock/infra/proto/recommendation/v1;recommendationv1";
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// RecommendationService returns deterministic recommendation results.
+//
+// Auth flow:
+// - Gateway validates JWT and forwards authenticated metadata.
+// - recommendation-service resolves identity from auth metadata.
+// - Clients must not provide user_id or external_user_id in public requests.
+service RecommendationService {
+  rpc GetProfileStatus(GetProfileStatusRequest) returns (GetProfileStatusResponse);
+  rpc GetBeverageRecommendations(GetBeverageRecommendationsRequest)
+      returns (GetBeverageRecommendationsResponse);
+  rpc RecordRecommendationEvent(RecordRecommendationEventRequest)
+      returns (RecordRecommendationEventResponse);
+}
+
+enum ProfileStatus {
+  PROFILE_STATUS_UNSPECIFIED = 0;
+  PROFILE_STATUS_MISSING = 1;
+  PROFILE_STATUS_PENDING_GENERATION = 2;
+  PROFILE_STATUS_ACTIVE = 3;
+  PROFILE_STATUS_STALE = 4;
+  PROFILE_STATUS_FAILED_GENERATION = 5;
+}
+
+enum BudgetMode {
+  BUDGET_MODE_UNSPECIFIED = 0;
+  BUDGET_MODE_SOFT = 1;
+  BUDGET_MODE_STRICT = 2;
+}
+
+enum RecommendationEventType {
+  RECOMMENDATION_EVENT_TYPE_UNSPECIFIED = 0;
+  RECOMMENDATION_EVENT_TYPE_IMPRESSION = 1;
+  RECOMMENDATION_EVENT_TYPE_CLICK = 2;
+  RECOMMENDATION_EVENT_TYPE_SAVE = 3;
+  RECOMMENDATION_EVENT_TYPE_DISMISS = 4;
+  RECOMMENDATION_EVENT_TYPE_DETAIL_VIEW = 5;
+}
+
+message GetProfileStatusRequest {}
+
+message GetProfileStatusResponse {
+  ProfileStatus status = 1;
+  int32 profile_revision = 2;
+  string survey_response_id = 3;
+  google.protobuf.Timestamp generated_at = 4;
+  string stale_reason = 5;
+}
+
+message GetBeverageRecommendationsRequest {
+  string category = 1;
+  int32 limit = 2;
+  BudgetMode budget_mode = 3;
+}
+
+message BeverageRecommendation {
+  int32 rank = 1;
+  string result_id = 2;
+  string beverage_id = 3;
+  string name_ko = 4;
+  string name_en = 5;
+  string category = 6;
+  double score = 7;
+  repeated string reason_codes = 8;
+  string explanation = 9;
+  google.protobuf.Struct metadata = 10;
+}
+
+message GetBeverageRecommendationsResponse {
+  string request_id = 1;
+  ProfileStatus profile_status = 2;
+  int32 profile_revision = 3;
+  repeated BeverageRecommendation recommendations = 4;
+}
+
+message RecordRecommendationEventRequest {
+  string request_id = 1;
+  string result_id = 2;
+  RecommendationEventType event_type = 3;
+  string idempotency_key = 4;
+  google.protobuf.Struct metadata = 5;
+}
+
+message RecordRecommendationEventResponse {
+  string interaction_id = 1;
+  bool duplicate = 2;
+}

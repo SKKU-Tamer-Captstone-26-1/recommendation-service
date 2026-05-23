@@ -53,6 +53,12 @@ def test_model_metadata_registers_foundation_tables() -> None:
         "venue_price_snapshots",
         "survey_sync_events",
         "dead_letter_events",
+        "recommendation_staging.beverage_collection_runs",
+        "recommendation_staging.beverage_catalog_candidates",
+        "recommendation_staging.beverage_flavor_profile_candidates",
+        "recommendation_staging.beverage_knowledge_candidates",
+        "recommendation_staging.beverage_price_observation_candidates",
+        "recommendation_staging.beverage_source_refs",
     }
 
     assert required_tables.issubset(Base.metadata.tables)

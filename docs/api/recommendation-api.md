@@ -64,10 +64,8 @@ This document defines the gRPC-first public and internal API contracts owned by
 - Use explicit status values instead of ambiguous empty arrays.
 - Include request IDs for traceability.
 - Do not generate code from temporary proto drafts.
-- Use `chat.proto` as style reference until the real recommendation proto is
-  accepted.
-- Before implementation, confirm the final proto path, package, and generated
-  code location.
+- Keep `proto/recommendation/v1/recommendation.proto` synchronized with this
+  document.
 
 ## Identity Rules
 
@@ -83,22 +81,36 @@ Public RPC requests MUST NOT contain `user_id` or `external_user_id` fields.
 
 ## gRPC Services
 
-The real `recommendation.proto` is not finalized yet. The intended service shape
-is:
+The initial `recommendation.proto` is defined for the beverage-first production
+slice. Current service shape:
 
 ```proto
 service RecommendationService {
   rpc GetProfileStatus(GetProfileStatusRequest) returns (GetProfileStatusResponse);
   rpc GetBeverageRecommendations(GetBeverageRecommendationsRequest) returns (GetBeverageRecommendationsResponse);
-  rpc GetVenueRecommendations(GetVenueRecommendationsRequest) returns (GetVenueRecommendationsResponse);
   rpc RecordRecommendationEvent(RecordRecommendationEventRequest) returns (RecordRecommendationEventResponse);
 }
+```
+
+The initial production beverage slice defines this contract at:
+
+```text
+proto/recommendation/v1/recommendation.proto
+```
+
+Python gRPC bindings live under:
+
+```text
+app/grpc/gen/
 ```
 
 Assistant API drafts are documented separately in
 `../assistant/response-schema.md`. Do not merge assistant RPCs into
 `RecommendationService` unless a future architecture decision explicitly places
 assistant runtime inside this repository.
+
+`GetVenueRecommendations` remains a planned RPC and must not be implemented
+until map/place snapshots and freshness semantics are populated.
 
 Internal operations SHOULD be separated from public recommendation reads:
 
@@ -169,26 +181,31 @@ Request fields:
 |---|---|---|
 | `category` | no | Filter by beverage category |
 | `limit` | no | Result count |
-| `budget_mode` | no | `strict` or `soft` |
+| `budget_mode` | no | `BUDGET_MODE_SOFT` or `BUDGET_MODE_STRICT` |
 
 Response:
 
 ```json
 {
   "request_id": "rec_req_123",
+  "profile_status": "PROFILE_STATUS_ACTIVE",
   "profile_revision": 4,
-  "results": [
+  "recommendations": [
     {
       "rank": 1,
-      "target_type": "beverage",
-      "target_id": "bev_123",
-      "name": "Example Bourbon",
-      "scores": {
-        "similarity": 0.87,
-        "final": 0.91
-      },
+      "result_id": "rec_result_456",
+      "beverage_id": "bev_123",
+      "name_ko": "Example Bourbon",
+      "name_en": "Example Bourbon",
+      "category": "whiskey",
+      "score": 0.91,
       "reason_codes": ["MATCHES_VANILLA_CARAMEL", "BEGINNER_FRIENDLY"],
-      "explanation": "Matches your vanilla/caramel preference and beginner-friendly profile."
+      "explanation": "Matches your vanilla/caramel preference and beginner-friendly profile.",
+      "metadata": {
+        "style": "bourbon",
+        "similarity_score": 0.87,
+        "score_breakdown": {}
+      }
     }
   ]
 }
@@ -258,7 +275,7 @@ Request:
 {
   "request_id": "rec_req_123",
   "result_id": "rec_result_456",
-  "event_type": "click",
+  "event_type": "RECOMMENDATION_EVENT_TYPE_CLICK",
   "metadata": {}
 }
 ```
@@ -266,11 +283,11 @@ Request:
 Supported interaction types:
 
 ```text
-impression
-click
-save
-dismiss
-detail_view
+RECOMMENDATION_EVENT_TYPE_IMPRESSION
+RECOMMENDATION_EVENT_TYPE_CLICK
+RECOMMENDATION_EVENT_TYPE_SAVE
+RECOMMENDATION_EVENT_TYPE_DISMISS
+RECOMMENDATION_EVENT_TYPE_DETAIL_VIEW
 ```
 
 ## Internal RPCs

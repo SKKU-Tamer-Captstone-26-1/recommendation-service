@@ -5,6 +5,10 @@ import grpc
 from grpc_health.v1 import health, health_pb2, health_pb2_grpc
 
 from app.core.config import Settings, get_settings
+from app.db.session import SessionLocal
+from app.grpc.gen import recommendation_pb2_grpc
+from app.grpc.recommendation_service import RecommendationGrpcServicer
+from app.services.auth import JwtAuthContextResolver
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +28,13 @@ def create_grpc_server(
         health_pb2.HealthCheckResponse.SERVING,
     )
     health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
+    recommendation_pb2_grpc.add_RecommendationServiceServicer_to_server(
+        RecommendationGrpcServicer(
+            SessionLocal,
+            JwtAuthContextResolver(resolved_settings),
+        ),
+        server,
+    )
 
     if bind_port:
         listen_addr = f"{resolved_settings.grpc_host}:{resolved_settings.grpc_port}"
