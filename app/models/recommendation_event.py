@@ -71,6 +71,11 @@ class RecommendationResult(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False,
         default=dict,
     )
+    source_snapshot_json: Mapped[JsonDict] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=dict,
+    )
     qdrant_point_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     request = relationship("RecommendationRequest", back_populates="results")

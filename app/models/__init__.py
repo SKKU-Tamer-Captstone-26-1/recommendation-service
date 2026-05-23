@@ -28,7 +28,13 @@ from app.models.staging import (
     BeveragePriceObservationCandidate,
     BeverageSourceRef,
 )
-from app.models.sync import DeadLetterEvent, SurveySyncCursor, SurveySyncEvent
+from app.models.sync import (
+    DeadLetterEvent,
+    MapSnapshotSyncCursor,
+    MapSnapshotSyncEvent,
+    SurveySyncCursor,
+    SurveySyncEvent,
+)
 from app.models.vector import QdrantPoint, RecommendationVector
 from app.models.versioning import MapperVersion, ScoringConfig, VectorSchemaVersion
 
@@ -45,6 +51,8 @@ __all__ = [
     "DeadLetterEvent",
     "FlavorProfile",
     "MapperVersion",
+    "MapSnapshotSyncCursor",
+    "MapSnapshotSyncEvent",
     "QdrantPoint",
     "RebuildJob",
     "RebuildJobItem",

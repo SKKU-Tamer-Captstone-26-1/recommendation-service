@@ -162,6 +162,7 @@ erDiagram
 
     survey_sync_cursors ||--o{ survey_sync_events : advances
     survey_sync_events ||--o{ dead_letter_events : may_fail
+    map_snapshot_sync_cursors ||--o{ map_snapshot_sync_events : advances
     rebuild_jobs ||--o{ rebuild_job_items : contains
 ```
 
@@ -444,6 +445,10 @@ Key fields:
 - `reason_codes`
 - `source_snapshot_json`
 
+For venue results, `source_snapshot_json` MUST include the place, menu,
+inventory, and price revisions used for ranking when those snapshots are
+available.
+
 ### `recommendation_explanations`
 
 Deterministic explanation payload.
@@ -473,6 +478,40 @@ Key fields:
 - `next_retry_at`
 - `last_error`
 
+### `map_snapshot_sync_cursors`
+
+Cursor state for map-service/place-service snapshot or event consumption.
+
+Key fields:
+
+- `source_name`
+- `cursor_value`
+- `last_synced_at`
+- `metadata_json`
+
+### `map_snapshot_sync_events`
+
+Idempotent map/place snapshot event processing state.
+
+These rows are recommendation-service sync state. They are not canonical
+map/place records.
+
+Key fields:
+
+- `event_id`
+- `event_type`
+- `place_id`
+- `place_revision`
+- `menu_revision`
+- `inventory_revision`
+- `price_revision`
+- `event_payload_json`
+- `status`
+- `attempt_count`
+- `next_retry_at`
+- `processed_at`
+- `last_error`
+
 ## Important Indexes
 
 Required indexes:
@@ -495,6 +534,9 @@ venue_price_snapshots(place_id, beverage_item_id)
 venue_price_snapshots(valid_until)
 survey_sync_events(event_id)
 survey_sync_events(status, next_retry_at)
+map_snapshot_sync_events(event_id)
+map_snapshot_sync_events(status, next_retry_at)
+map_snapshot_sync_events(place_id)
 recommendation_results(request_id, rank)
 ```
 

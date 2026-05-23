@@ -51,6 +51,8 @@ def test_model_metadata_registers_foundation_tables() -> None:
         "venue_menu_snapshots",
         "venue_inventory_snapshots",
         "venue_price_snapshots",
+        "map_snapshot_sync_cursors",
+        "map_snapshot_sync_events",
         "survey_sync_events",
         "dead_letter_events",
         "recommendation_staging.beverage_collection_runs",
