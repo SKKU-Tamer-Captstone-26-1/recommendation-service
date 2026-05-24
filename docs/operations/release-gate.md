@@ -40,7 +40,13 @@ This additionally runs:
 
 ```bash
 python3 -m alembic upgrade head
+python3 -m app.tools.operational_metrics_smoke
 ```
+
+The operational metrics smoke reads recommendation-owned PostgreSQL tables only.
+It checks that the beta metrics surface includes request count, empty-result
+rate, profile missing rate, sync lag, catalog audit failure count, and Qdrant
+failure count.
 
 ## Optional Qdrant Rebuild Smoke
 
@@ -78,6 +84,22 @@ This additionally:
   beverage recommendation logging
 - runs the map snapshot import and selected-beverage venue recommendation smoke
   with place, menu, inventory, and price revisions preserved in logs
+
+## Operations Metrics Endpoint
+
+The HTTP API exposes:
+
+```text
+GET /v1/operations/metrics
+```
+
+The response is intentionally flat and machine-readable for beta operations. It
+includes persisted counts from recommendation-owned tables plus process-local
+latency counters when the running process has served recommendation requests.
+
+The endpoint does not read survey-service or map-service databases. Survey and
+map health are represented only through recommendation-owned sync event tables,
+dead letters, cursors, and map snapshot read-model state.
 
 ## Rollback Notes
 

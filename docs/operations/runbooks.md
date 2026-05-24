@@ -172,3 +172,37 @@ Staleness rule:
 ```text
 No fresh structured snapshot means no fresh venue availability or price claim.
 ```
+
+## Operational Metrics Triage
+
+Use when beta operators need a quick service health snapshot beyond liveness and
+readiness.
+
+1. Query:
+
+```bash
+python3 -m app.tools.operational_metrics_smoke
+```
+
+or call:
+
+```text
+GET /v1/operations/metrics
+```
+
+2. Investigate these first:
+   - `catalog_audit_critical_count`
+   - `recommendation_empty_rate`
+   - `profile_missing_rate`
+   - `survey_sync_max_lag_seconds`
+   - `map_snapshot_sync_max_lag_seconds`
+   - `qdrant_failed_point_count`
+
+3. Use the relevant runbook above for rollback or replay.
+
+Metrics rule:
+
+```text
+Operational metrics are advisory beta telemetry. PostgreSQL recommendation-owned
+state remains canonical, and Qdrant remains rebuildable.
+```

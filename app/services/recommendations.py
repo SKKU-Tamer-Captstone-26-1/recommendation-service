@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import logging
 import math
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from time import perf_counter
 from typing import Any
 
 from sqlalchemy import select
@@ -33,6 +35,7 @@ from app.repositories.catalog import (
     VenueSnapshotCandidate,
 )
 from app.repositories.profiles import ProfileRepository
+from app.services.runtime_metrics import runtime_metrics
 
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 50
@@ -42,6 +45,8 @@ FRESH_INVENTORY_DAYS = 3
 STALE_INVENTORY_DAYS = 7
 EXCLUDE_INVENTORY_DAYS = 30
 EXCLUDE_PRICE_EXPIRED_DAYS = 30
+
+logger = logging.getLogger(__name__)
 
 
 class RecommendationPreconditionError(ValueError):
@@ -185,6 +190,7 @@ class BeverageRecommendationService:
         limit: int | None = None,
         budget_mode: str = "soft",
     ) -> BeverageRecommendationResponse:
+        started_at = perf_counter()
         if budget_mode == "strict":
             raise RecommendationPreconditionError(
                 "strict budget filtering is unavailable until approved canonical "
@@ -194,6 +200,13 @@ class BeverageRecommendationService:
         profile = self._profiles.get_active_profile_revision(external_user_id)
         if profile is None or profile.status != ProfileStatus.ACTIVE.value:
             status = self.get_profile_status(external_user_id)
+            _log_recommendation_skipped(
+                target_type=RecommendationTargetType.BEVERAGE.value,
+                profile_status=status.status,
+                profile_revision=status.profile_revision,
+                error_type="profile_not_active",
+                latency_ms=_elapsed_ms(started_at),
+            )
             return BeverageRecommendationResponse(
                 request_id=None,
                 profile_status=status.status,
@@ -314,13 +327,26 @@ class BeverageRecommendationService:
                 ),
             )
 
-        return BeverageRecommendationResponse(
+        response = BeverageRecommendationResponse(
             request_id=request.id,
             profile_status=ProfileStatus.ACTIVE.value,
             profile_revision=profile.profile_revision,
             scoring_config_version=scoring_config.version,
             results=tuple(response_items),
         )
+        _log_recommendation_completed(
+            request_id=request.id,
+            target_type=RecommendationTargetType.BEVERAGE.value,
+            profile_revision=profile.profile_revision,
+            scoring_config_version=scoring_config.version,
+            vector_schema_version=_vector_schema_version(profile),
+            result_count=len(response_items),
+            latency_ms=_elapsed_ms(started_at),
+            catalog_source_versions=_catalog_source_versions(
+                candidate for candidate, _score in ranked
+            ),
+        )
+        return response
 
     def get_venue_recommendations(
         self,
@@ -334,6 +360,7 @@ class BeverageRecommendationService:
         budget_mode: str = "soft",
         now: datetime | None = None,
     ) -> VenueRecommendationResponse:
+        started_at = perf_counter()
         if budget_mode not in {"soft", "strict"}:
             raise ValueError("budget_mode must be soft or strict")
         selected_id = _parse_uuid(selected_beverage_id, "selected_beverage_id")
@@ -347,6 +374,13 @@ class BeverageRecommendationService:
         profile = self._profiles.get_active_profile_revision(external_user_id)
         if profile is None or profile.status != ProfileStatus.ACTIVE.value:
             status = self.get_profile_status(external_user_id)
+            _log_recommendation_skipped(
+                target_type=RecommendationTargetType.VENUE.value,
+                profile_status=status.status,
+                profile_revision=status.profile_revision,
+                error_type="profile_not_active",
+                latency_ms=_elapsed_ms(started_at),
+            )
             return VenueRecommendationResponse(
                 request_id=None,
                 profile_status=status.status,
@@ -456,13 +490,24 @@ class BeverageRecommendationService:
                 ),
             )
 
-        return VenueRecommendationResponse(
+        response = VenueRecommendationResponse(
             request_id=request.id,
             profile_status=ProfileStatus.ACTIVE.value,
             profile_revision=profile.profile_revision,
             scoring_config_version=scoring_config.version,
             results=tuple(response_items),
         )
+        _log_recommendation_completed(
+            request_id=request.id,
+            target_type=RecommendationTargetType.VENUE.value,
+            profile_revision=profile.profile_revision,
+            scoring_config_version=scoring_config.version,
+            vector_schema_version=_vector_schema_version(profile),
+            result_count=len(response_items),
+            latency_ms=_elapsed_ms(started_at),
+            map_snapshot_revisions=_map_snapshot_revisions(response_items),
+        )
+        return response
 
     def record_interaction(
         self,
@@ -1129,6 +1174,104 @@ def _option_reason_code(option_type: str) -> str:
         VenueOptionType.BEST_PRICE.value: "BEST_PRICE",
         VenueOptionType.BALANCED_BEST.value: "BALANCED_BEST",
     }[option_type]
+
+
+def _log_recommendation_completed(
+    *,
+    request_id: uuid.UUID,
+    target_type: str,
+    profile_revision: int,
+    scoring_config_version: str,
+    vector_schema_version: str,
+    result_count: int,
+    latency_ms: float,
+    catalog_source_versions: list[str] | None = None,
+    map_snapshot_revisions: list[dict[str, Any]] | None = None,
+) -> None:
+    runtime_metrics.record(
+        f"{target_type}_recommendation",
+        latency_ms=latency_ms,
+    )
+    payload: dict[str, Any] = {
+        "event": "recommendation.completed",
+        "request_id": str(request_id),
+        "target_type": target_type,
+        "profile_revision": profile_revision,
+        "scoring_config": scoring_config_version,
+        "vector_schema": vector_schema_version,
+        "result_count": result_count,
+        "latency_ms": latency_ms,
+    }
+    if catalog_source_versions is not None:
+        payload["catalog_source_versions"] = catalog_source_versions
+    if map_snapshot_revisions is not None:
+        payload["map_snapshot_revisions"] = map_snapshot_revisions
+    logger.info("recommendation request completed", extra={"structured": payload})
+
+
+def _log_recommendation_skipped(
+    *,
+    target_type: str,
+    profile_status: str,
+    profile_revision: int | None,
+    error_type: str,
+    latency_ms: float,
+) -> None:
+    runtime_metrics.record(
+        f"{target_type}_recommendation",
+        latency_ms=latency_ms,
+    )
+    logger.info(
+        "recommendation request skipped",
+        extra={
+            "structured": {
+                "event": "recommendation.skipped",
+                "target_type": target_type,
+                "profile_status": profile_status,
+                "profile_revision": profile_revision,
+                "error_type": error_type,
+                "result_count": 0,
+                "latency_ms": latency_ms,
+            },
+        },
+    )
+
+
+def _catalog_source_versions(
+    candidates: Any,
+) -> list[str]:
+    versions = {
+        str(candidate.beverage.metadata_json.get("source_version"))
+        for candidate in candidates
+        if candidate.beverage.metadata_json.get("source_version")
+    }
+    return sorted(versions)
+
+
+def _map_snapshot_revisions(
+    items: list[VenueRecommendationItem],
+) -> list[dict[str, Any]]:
+    revisions: list[dict[str, Any]] = []
+    for item in items:
+        revisions.append(
+            {
+                "place_id": item.place_id,
+                "place_revision": item.source_metadata.get("place_revision"),
+                "menu_revision": item.source_metadata.get("menu_revision"),
+                "inventory_revision": item.source_metadata.get("inventory_revision"),
+                "price_revision": item.source_metadata.get("price_revision"),
+            },
+        )
+    return revisions
+
+
+def _vector_schema_version(profile: TasteProfileRevision) -> str:
+    version = getattr(profile.vector_schema_version, "version", None)
+    return str(version or profile.vector_schema_version_id)
+
+
+def _elapsed_ms(started_at: float) -> float:
+    return round((perf_counter() - started_at) * 1000, 3)
 
 
 def _aware(value: datetime | None) -> datetime | None:

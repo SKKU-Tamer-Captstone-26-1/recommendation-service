@@ -30,6 +30,7 @@ rg -n \
 
 if [[ "${RUN_DB_SMOKE:-0}" == "1" ]]; then
   python3 -m alembic upgrade head
+  python3 -m app.tools.operational_metrics_smoke
 fi
 
 if [[ "${RUN_QDRANT_SMOKE:-0}" == "1" ]]; then
