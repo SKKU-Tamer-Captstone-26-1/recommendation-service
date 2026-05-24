@@ -163,6 +163,7 @@ Domain docs live here:
 | PostgreSQL and Qdrant metadata model | `database/erd.md` |
 | Migration rules | `database/migration-strategy.md` |
 | Release gate | `operations/release-gate.md` |
+| Operations runbooks | `operations/runbooks.md` |
 | Derived-state decision | `decisions/adr-001-derived-state.md` |
 
 ## Reading Order
@@ -246,6 +247,7 @@ docs/
   - migration-strategy.md
 - operations/
   - release-gate.md
+  - runbooks.md
 - decisions/
   - adr-001-derived-state.md
 ```
