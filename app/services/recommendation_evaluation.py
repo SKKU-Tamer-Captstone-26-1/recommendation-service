@@ -298,6 +298,13 @@ def _profile_from_fixture(
 def _aggregate_metrics(
     fixture_results: tuple[FixtureEvaluationResult, ...],
 ) -> dict[str, Any]:
+    positive_above_negative_count = sum(
+        1
+        for result in fixture_results
+        if result.average_positive_score is not None
+        and result.average_negative_score is not None
+        and result.average_positive_score > result.average_negative_score
+    )
     return {
         "fixture_count": len(fixture_results),
         "top_k_hit_rate": _ratio(
@@ -313,12 +320,12 @@ def _aggregate_metrics(
         "average_reason_code_coverage": _average(
             result.reason_code_coverage for result in fixture_results
         ),
-        "fixtures_with_positive_score_above_negative": sum(
-            1
-            for result in fixture_results
-            if result.average_positive_score is not None
-            and result.average_negative_score is not None
-            and result.average_positive_score > result.average_negative_score
+        "fixtures_with_positive_score_above_negative": (
+            positive_above_negative_count
+        ),
+        "positive_score_above_negative_rate": _ratio(
+            positive_above_negative_count,
+            len(fixture_results),
         ),
     }
 

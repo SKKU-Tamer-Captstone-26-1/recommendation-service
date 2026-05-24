@@ -19,7 +19,7 @@ def test_drink_evaluation_fixtures_load() -> None:
         Path("data/evaluation/drink_profiles_v1.json"),
     )
 
-    assert len(fixtures) >= 5
+    assert len(fixtures) >= 20
     assert fixtures[0].fixture_id
     assert fixtures[0].positive_catalog_keys
 
@@ -40,8 +40,11 @@ def test_drink_evaluation_report_is_deterministic_for_seed_records() -> None:
     )
 
     assert report.metrics["fixture_count"] == len(fixtures)
-    assert report.metrics["top_k_hit_rate"] >= 0.5
-    assert report.metrics["negative_violation_count"] >= 0
+    assert report.metrics["top_k_hit_rate"] >= 0.85
+    assert report.metrics["negative_violation_count"] == 0
+    assert report.metrics["average_category_style_match_rate"] >= 0.65
+    assert report.metrics["average_reason_code_coverage"] >= 0.95
+    assert report.metrics["positive_score_above_negative_rate"] >= 0.9
     assert all(result.top_results for result in report.fixture_results)
 
 

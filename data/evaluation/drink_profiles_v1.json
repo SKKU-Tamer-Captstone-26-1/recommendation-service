@@ -164,6 +164,391 @@
         "CATEGORY_MATCH",
         "BEGINNER_FRIENDLY"
       ]
+    },
+    {
+      "fixture_id": "smoky_scotch_expert",
+      "profile_name": "Expert smoky oak whiskey profile",
+      "survey_answers": {
+        "experience_level": "expert",
+        "categories": ["whiskey"],
+        "category_traits": {
+          "whiskey": ["smoky_peat", "oak_woody"]
+        },
+        "global_keywords": ["smoky_peat", "oak_woody"],
+        "budget_range": "over_100000"
+      },
+      "expected_categories": ["whiskey"],
+      "expected_styles": ["single malt scotch whisky"],
+      "positive_catalog_keys": [
+        "whiskey.laphroaig_10_year_old",
+        "whiskey.the_macallan_12_years_double_cask"
+      ],
+      "negative_catalog_keys": [
+        "beer.asahi_super_dry",
+        "wine.kim_crawford_sauvignon_blanc"
+      ],
+      "expected_reason_codes": [
+        "CATEGORY_MATCH",
+        "MATCHES_SMOKY_PROFILE"
+      ]
+    },
+    {
+      "fixture_id": "cognac_dried_fruit",
+      "profile_name": "Dried fruit and oak cognac profile",
+      "survey_answers": {
+        "experience_level": "enthusiast",
+        "categories": ["brandy_cognac"],
+        "category_traits": {
+          "brandy_cognac": ["dried_fruit_chocolate", "oak_woody"]
+        },
+        "global_keywords": ["dried_fruit_chocolate", "oak_woody"],
+        "budget_range": "over_100000"
+      },
+      "expected_categories": ["brandy_cognac"],
+      "expected_styles": ["cognac"],
+      "positive_catalog_keys": [
+        "brandy_cognac.hennessy_vsop",
+        "brandy_cognac.remy_martin_vsop"
+      ],
+      "negative_catalog_keys": [
+        "beer.corona_extra",
+        "vodka.absolut_vodka"
+      ],
+      "expected_reason_codes": [
+        "CATEGORY_MATCH",
+        "MATCHES_RICH_OAK_PROFILE"
+      ]
+    },
+    {
+      "fixture_id": "refreshing_cocktail_beginner",
+      "profile_name": "Beginner refreshing citrus cocktail profile",
+      "survey_answers": {
+        "experience_level": "beginner",
+        "categories": ["cocktail"],
+        "category_traits": {
+          "cocktail": ["citrus_berry", "sour"]
+        },
+        "global_keywords": ["citrus_berry", "sour"],
+        "budget_range": "under_70000"
+      },
+      "expected_categories": ["cocktail", "wine"],
+      "expected_styles": ["classic cocktail", "white wine", "red wine"],
+      "positive_catalog_keys": [
+        "cocktail.margarita",
+        "cocktail.daiquiri"
+      ],
+      "negative_catalog_keys": [
+        "brandy_cognac.hennessy_vsop",
+        "whiskey.laphroaig_10_year_old"
+      ],
+      "expected_reason_codes": [
+        "BEGINNER_FRIENDLY",
+        "MATCHES_FRUITY_BRIGHT_PROFILE"
+      ]
+    },
+    {
+      "fixture_id": "botanical_gin_floral",
+      "profile_name": "Botanical floral gin profile",
+      "survey_answers": {
+        "experience_level": "enthusiast",
+        "categories": ["gin"],
+        "category_traits": {
+          "gin": ["herbal_mint", "floral"]
+        },
+        "global_keywords": ["herbal_mint", "floral"],
+        "budget_range": "30000_100000"
+      },
+      "expected_categories": ["gin"],
+      "expected_styles": ["gin", "London dry gin"],
+      "positive_catalog_keys": [
+        "gin.hendricks_gin",
+        "gin.tanqueray_london_dry_gin"
+      ],
+      "negative_catalog_keys": [
+        "liqueur.baileys_original_irish_cream",
+        "rum.captain_morgan_original_spiced_gold"
+      ],
+      "expected_reason_codes": [
+        "CATEGORY_MATCH",
+        "MATCHES_HERBAL_BITTER_PROFILE"
+      ]
+    },
+    {
+      "fixture_id": "orange_aperitivo_liqueur",
+      "profile_name": "Orange and bitter aperitivo liqueur profile",
+      "survey_answers": {
+        "experience_level": "beginner",
+        "categories": ["liqueur"],
+        "category_traits": {
+          "liqueur": ["citrus_berry", "herbal_mint"]
+        },
+        "global_keywords": ["citrus_berry", "herbal_mint"],
+        "budget_range": "under_70000"
+      },
+      "expected_categories": ["liqueur", "gin", "wine"],
+      "expected_styles": ["aperitivo liqueur", "orange liqueur", "London dry gin"],
+      "positive_catalog_keys": [
+        "liqueur.aperol",
+        "liqueur.cointreau"
+      ],
+      "negative_catalog_keys": [
+        "whiskey.buffalo_trace_bourbon",
+        "vodka.grey_goose_vodka"
+      ],
+      "expected_reason_codes": [
+        "CATEGORY_MATCH",
+        "MATCHES_HERBAL_BITTER_PROFILE",
+        "MATCHES_FRUITY_BRIGHT_PROFILE"
+      ]
+    },
+    {
+      "fixture_id": "aged_rum_sweet_spice",
+      "profile_name": "Sweet spice rum profile",
+      "survey_answers": {
+        "experience_level": "enthusiast",
+        "categories": ["rum"],
+        "category_traits": {
+          "rum": ["vanilla_caramel", "spicy"]
+        },
+        "global_keywords": ["vanilla_caramel", "spicy"],
+        "budget_range": "30000_100000"
+      },
+      "expected_categories": ["rum", "whiskey"],
+      "expected_styles": ["aged rum", "spiced rum", "white rum", "bourbon"],
+      "positive_catalog_keys": [
+        "rum.captain_morgan_original_spiced_gold",
+        "rum.mount_gay_eclipse"
+      ],
+      "negative_catalog_keys": [
+        "wine.cloudy_bay_sauvignon_blanc",
+        "beer.asahi_super_dry"
+      ],
+      "expected_reason_codes": [
+        "CATEGORY_MATCH",
+        "MATCHES_VANILLA_CARAMEL",
+        "MATCHES_ROUNDED_BODY"
+      ]
+    },
+    {
+      "fixture_id": "clean_sake_light",
+      "profile_name": "Clean light sake profile",
+      "survey_answers": {
+        "experience_level": "beginner",
+        "categories": ["sake_shochu"],
+        "category_traits": {
+          "sake_shochu": ["floral"]
+        },
+        "global_keywords": ["floral"],
+        "budget_range": "under_70000"
+      },
+      "expected_categories": ["sake_shochu", "gin"],
+      "expected_styles": ["sake", "gin"],
+      "positive_catalog_keys": [
+        "sake_shochu.dassai_45",
+        "sake_shochu.hakkaisan_tokubetsu_junmai"
+      ],
+      "negative_catalog_keys": [
+        "whiskey.buffalo_trace_bourbon",
+        "brandy_cognac.hennessy_vsop"
+      ],
+      "expected_reason_codes": [
+        "CATEGORY_MATCH",
+        "MATCHES_CLEAN_LIGHT_PROFILE",
+        "BEGINNER_FRIENDLY"
+      ]
+    },
+    {
+      "fixture_id": "agave_smoky_mezcal",
+      "profile_name": "Smoky agave mezcal profile",
+      "survey_answers": {
+        "experience_level": "expert",
+        "categories": ["tequila_mezcal"],
+        "category_traits": {
+          "tequila_mezcal": ["smoky_peat", "spicy"]
+        },
+        "global_keywords": ["smoky_peat", "spicy"],
+        "budget_range": "30000_100000"
+      },
+      "expected_categories": ["tequila_mezcal", "whiskey"],
+      "expected_styles": ["mezcal", "tequila", "single malt scotch whisky"],
+      "positive_catalog_keys": [
+        "tequila_mezcal.del_maguey_vida_puebla_mezcal",
+        "tequila_mezcal.don_julio_1942"
+      ],
+      "negative_catalog_keys": [
+        "liqueur.baileys_original_irish_cream",
+        "wine.kim_crawford_sauvignon_blanc"
+      ],
+      "expected_reason_codes": [
+        "CATEGORY_MATCH",
+        "MATCHES_SMOKY_PROFILE",
+        "MATCHES_EARTHY_AGAVE_PROFILE"
+      ]
+    },
+    {
+      "fixture_id": "clean_vodka_mixer",
+      "profile_name": "Clean vodka mixer profile",
+      "survey_answers": {
+        "experience_level": "beginner",
+        "categories": ["vodka"],
+        "category_traits": {
+          "vodka": ["spirit_forward"]
+        },
+        "global_keywords": ["spirit_forward"],
+        "budget_range": "under_70000"
+      },
+      "expected_categories": ["vodka"],
+      "expected_styles": ["vodka"],
+      "positive_catalog_keys": [
+        "vodka.absolut_vodka",
+        "vodka.smirnoff_no_21_vodka"
+      ],
+      "negative_catalog_keys": [
+        "liqueur.baileys_original_irish_cream",
+        "wine.kim_crawford_sauvignon_blanc"
+      ],
+      "expected_reason_codes": [
+        "CATEGORY_MATCH",
+        "MATCHES_CLEAN_LIGHT_PROFILE",
+        "BEGINNER_FRIENDLY"
+      ]
+    },
+    {
+      "fixture_id": "red_wine_tannin",
+      "profile_name": "Red wine tannin and fruit profile",
+      "survey_answers": {
+        "experience_level": "enthusiast",
+        "categories": ["wine"],
+        "category_traits": {
+          "wine": ["citrus_berry", "oak_woody"]
+        },
+        "global_keywords": ["citrus_berry", "oak_woody"],
+        "budget_range": "30000_100000"
+      },
+      "expected_categories": ["wine"],
+      "expected_styles": ["red wine", "white wine"],
+      "positive_catalog_keys": [
+        "wine.louis_jadot_beaujolais_villages",
+        "wine.robert_mondavi_private_selection_cabernet_sauvignon"
+      ],
+      "negative_catalog_keys": [
+        "vodka.absolut_vodka",
+        "beer.asahi_super_dry"
+      ],
+      "expected_reason_codes": [
+        "CATEGORY_MATCH",
+        "MATCHES_FRUITY_BRIGHT_PROFILE"
+      ]
+    },
+    {
+      "fixture_id": "stout_roasted_beer",
+      "profile_name": "Roasted stout beer profile",
+      "survey_answers": {
+        "experience_level": "enthusiast",
+        "categories": ["beer"],
+        "category_traits": {
+          "beer": ["dried_fruit_chocolate"]
+        },
+        "global_keywords": ["dried_fruit_chocolate"],
+        "budget_range": "under_70000"
+      },
+      "expected_categories": ["beer", "liqueur"],
+      "expected_styles": ["stout", "lager", "wheat beer", "coffee liqueur"],
+      "positive_catalog_keys": [
+        "beer.guinness_draught",
+        "beer.heineken_original"
+      ],
+      "negative_catalog_keys": [
+        "tequila_mezcal.patron_silver_tequila",
+        "wine.cloudy_bay_sauvignon_blanc"
+      ],
+      "expected_reason_codes": [
+        "CATEGORY_MATCH",
+        "MATCHES_ROASTED_PROFILE"
+      ]
+    },
+    {
+      "fixture_id": "low_abv_makgeolli",
+      "profile_name": "Low-ABV tart makgeolli profile",
+      "survey_answers": {
+        "experience_level": "beginner",
+        "categories": ["traditional_korean_alcohol"],
+        "category_traits": {
+          "traditional_korean_alcohol": ["sour"]
+        },
+        "global_keywords": ["sour"],
+        "budget_range": "under_70000"
+      },
+      "expected_categories": ["traditional_korean_alcohol", "wine", "cocktail"],
+      "expected_styles": ["makgeolli", "white wine", "classic cocktail"],
+      "positive_catalog_keys": [
+        "traditional_korean_alcohol.kooksoondang_draft_makgeolli"
+      ],
+      "negative_catalog_keys": [
+        "whiskey.the_macallan_12_years_double_cask",
+        "vodka.grey_goose_vodka"
+      ],
+      "expected_reason_codes": [
+        "CATEGORY_MATCH",
+        "MATCHES_FRUITY_BRIGHT_PROFILE",
+        "BEGINNER_FRIENDLY"
+      ]
+    },
+    {
+      "fixture_id": "spirit_forward_old_fashioned",
+      "profile_name": "Spirit-forward old fashioned profile",
+      "survey_answers": {
+        "experience_level": "expert",
+        "categories": ["cocktail", "whiskey"],
+        "category_traits": {
+          "cocktail": ["spirit_forward", "vanilla_caramel"],
+          "whiskey": ["oak_woody"]
+        },
+        "global_keywords": ["spirit_forward", "vanilla_caramel", "oak_woody"],
+        "budget_range": "30000_100000"
+      },
+      "expected_categories": ["whiskey", "rum"],
+      "expected_styles": ["bourbon", "single malt scotch whisky", "Irish whiskey", "white rum"],
+      "positive_catalog_keys": [
+        "whiskey.buffalo_trace_bourbon",
+        "whiskey.the_macallan_12_years_double_cask"
+      ],
+      "negative_catalog_keys": [
+        "wine.kim_crawford_sauvignon_blanc",
+        "beer.asahi_super_dry"
+      ],
+      "expected_reason_codes": [
+        "CATEGORY_MATCH",
+        "MATCHES_VANILLA_CARAMEL",
+        "MATCHES_RICH_OAK_PROFILE"
+      ]
+    },
+    {
+      "fixture_id": "premium_white_wine_floral",
+      "profile_name": "Premium floral white wine profile",
+      "survey_answers": {
+        "experience_level": "enthusiast",
+        "categories": ["wine"],
+        "category_traits": {
+          "wine": ["floral", "citrus_berry"]
+        },
+        "global_keywords": ["floral", "citrus_berry"],
+        "budget_range": "over_100000"
+      },
+      "expected_categories": ["wine"],
+      "expected_styles": ["white wine", "red wine"],
+      "positive_catalog_keys": [
+        "wine.kim_crawford_sauvignon_blanc",
+        "wine.cloudy_bay_sauvignon_blanc"
+      ],
+      "negative_catalog_keys": [
+        "brandy_cognac.hennessy_vsop",
+        "whiskey.laphroaig_10_year_old"
+      ],
+      "expected_reason_codes": [
+        "CATEGORY_MATCH",
+        "MATCHES_FRUITY_BRIGHT_PROFILE"
+      ]
     }
   ]
 }
