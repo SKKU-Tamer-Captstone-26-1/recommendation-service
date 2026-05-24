@@ -129,6 +129,9 @@ class MapSnapshotImportService:
         if "lat" in payload and "lng" in payload:
             snapshot_json.setdefault("lat", payload["lat"])
             snapshot_json.setdefault("lng", payload["lng"])
+        if "lat" in venue_payload and "lng" in venue_payload:
+            snapshot_json.setdefault("lat", venue_payload["lat"])
+            snapshot_json.setdefault("lng", venue_payload["lng"])
         venue = VenueSnapshot(
             place_id=place_id,
             place_revision=place_revision,

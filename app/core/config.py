@@ -51,11 +51,19 @@ class Settings(BaseSettings):
 
     survey_service_url: str = "http://localhost:8082"
     survey_service_grpc_addr: str = "localhost:50053"
+    survey_events_path: str = "/internal/v1/recommendation/survey-events"
+    survey_response_path_template: str = (
+        "/internal/v1/recommendation/survey-responses/{survey_response_id}"
+    )
+    survey_request_timeout_seconds: float = 10.0
     survey_events_poll_interval_seconds: int = 10
     survey_events_page_size: int = 100
 
     map_service_url: str = "http://localhost:8083"
     map_service_grpc_addr: str = "localhost:50054"
+    map_snapshot_events_path: str = "/internal/v1/recommendation/map-snapshot-events"
+    map_snapshot_events_page_size: int = 100
+    map_snapshot_request_timeout_seconds: float = 10.0
 
     sync_worker_enabled: bool = True
     sync_max_attempts: int = 5

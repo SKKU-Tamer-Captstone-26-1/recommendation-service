@@ -3,6 +3,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.models.enums import ProfileStatus
 from app.models.profile import TasteProfileRevision, UserProfileState
 
 
@@ -38,5 +39,7 @@ class ProfileRepository:
                 UserProfileState.active_profile_revision_id == TasteProfileRevision.id,
             )
             .where(UserProfileState.external_user_id == external_user_id)
+            .where(UserProfileState.status == ProfileStatus.ACTIVE.value)
+            .where(TasteProfileRevision.status == ProfileStatus.ACTIVE.value)
         )
         return self._session.scalar(statement)

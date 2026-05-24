@@ -57,24 +57,133 @@ place.updated
 place.hidden
 place.closed
 place.merged
+place.deleted
 menu.updated
 inventory.updated
 price.updated
 ```
 
-Each event SHOULD include:
+The V1 sync input is a paginated map-service/place-service API response. It is
+the contract consumed by `recommendation-service`; it is not a canonical map
+database schema.
+
+Endpoint:
+
+```text
+GET /internal/v1/recommendation/map-snapshot-events?cursor=<cursor>&limit=<limit>
+```
+
+Response:
 
 ```json
 {
+  "cursor": "map_cursor_123",
+  "next_cursor": "map_cursor_124",
+  "has_more": true,
+  "snapshot_watermark": "2026-05-22T09:00:00Z",
+  "events": []
+}
+```
+
+Each event MUST include:
+
+```json
+{
+  "contract_version": "map_snapshot_event_v1",
   "event_id": "map_evt_123",
   "event_type": "inventory.updated",
   "occurred_at": "2026-05-22T09:00:00Z",
   "place_id": "place_123",
   "place_revision": "place_rev_12",
-  "inventory_revision": "inv_rev_8",
-  "price_revision": "price_rev_3"
+  "trace_id": "trace_123",
+  "venue": {
+    "name": "Example Bottle Shop",
+    "place_type": "bottle_shop",
+    "address": "Seoul, Gangnam-gu",
+    "lat": 37.5001,
+    "lng": 127.0276,
+    "status": "active",
+    "publication_status": "published",
+    "stale_after": "2026-05-30T00:00:00Z"
+  },
+  "menus": [
+    {
+      "menu_item_id": "menu_123",
+      "menu_revision": "menu_rev_7",
+      "beverage_item_id": "11111111-1111-4111-8111-111111111111",
+      "source_beverage_id": "map_bev_123",
+      "menu_name": "Example Bourbon",
+      "menu_type": "bottle",
+      "status": "active"
+    }
+  ],
+  "inventory": [
+    {
+      "inventory_revision": "inv_rev_8",
+      "beverage_item_id": "11111111-1111-4111-8111-111111111111",
+      "source_beverage_id": null,
+      "availability_status": "available",
+      "confidence": 0.9,
+      "last_seen_at": "2026-05-22T09:00:00Z",
+      "expires_at": "2026-05-25T09:00:00Z"
+    }
+  ],
+  "prices": [
+    {
+      "price_revision": "price_rev_3",
+      "beverage_item_id": "11111111-1111-4111-8111-111111111111",
+      "menu_item_id": "menu_123",
+      "price_krw": 42000,
+      "price_type": "retail",
+      "confidence": 0.85,
+      "valid_from": "2026-05-22T00:00:00Z",
+      "valid_until": "2026-05-30T00:00:00Z"
+    }
+  ]
 }
 ```
+
+Required event fields:
+
+| Field | Rule |
+|---|---|
+| `contract_version` | Required. Must be `map_snapshot_event_v1` for this contract. |
+| `event_id` | Required idempotency key. |
+| `event_type` | Required. Must be one of the supported event types above. |
+| `occurred_at` | Required source event timestamp. |
+| `place_id` | Required canonical map/place identifier. |
+| `place_revision` | Required source revision for the venue snapshot. |
+| `venue.lat` / `venue.lng` | Required WGS84 coordinates for MVP distance scoring. Top-level `lat` / `lng` may be accepted only for backwards-compatible local fixtures. |
+| `venue.status` | Required source lifecycle status. |
+| `venue.publication_status` | Required publication state for ranking eligibility. |
+| `menus[].menu_revision` | Required when menu rows are present. |
+| `menus[].source_beverage_id` | Optional map-service/source catalog key when no recommendation `beverage_item_id` mapping exists yet. |
+| `inventory[].inventory_revision` | Required when inventory rows are present. |
+| `prices[].price_revision` | Required when price rows are present. |
+| `inventory[].confidence` | Required confidence in range `0.0..1.0`. |
+| `prices[].confidence` | Required confidence in range `0.0..1.0`. |
+| `snapshot_watermark` | Required on paginated responses. Records the map-service snapshot/replay watermark for observability. |
+
+Lifecycle handling:
+
+| Source status | Recommendation read-model handling |
+|---|---|
+| `active` + `published` | Eligible if menu/inventory/price filters pass. |
+| `hidden` | Store snapshot but exclude from ranking. |
+| `closed` | Store snapshot but exclude from ranking. |
+| `duplicate_merged` | Store snapshot but exclude from ranking. |
+| `archived` | Store snapshot but exclude from ranking. |
+| `rejected` | Store snapshot but exclude from ranking. |
+| `deleted` | Treat as archived/ineligible read model state; do not hard-delete recommendation snapshots. |
+
+The sync worker MUST NOT reactivate, close, merge, archive, or edit canonical
+places. Closed, archived, and duplicate-merged source statuses remain canonical
+map-service/place-service decisions.
+
+`place.deleted` events from map-service/place-service are tombstone signals for
+the recommendation read model. They MUST preserve event payload and source
+revision metadata, mark the derived snapshot ineligible, and keep historical
+recommendation logs explainable.
 
 ## Read-Model Tables
 

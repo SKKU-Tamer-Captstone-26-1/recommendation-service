@@ -10,12 +10,13 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.domain.vector_schema import TASTE_V1_DIMENSIONS, TASTE_V1_NAME
-from app.models.enums import ProfileStatus
+from app.models.enums import ProfileStatus, VectorOwnerType
 from app.models.profile import (
     SurveySourceSnapshot,
     TasteProfileRevision,
     UserProfileState,
 )
+from app.models.vector import RecommendationVector
 from app.models.versioning import MapperVersion, ScoringConfig, VectorSchemaVersion
 
 KEYWORD_DIMENSION_WEIGHTS: dict[str, dict[str, float]] = {
@@ -154,6 +155,38 @@ class ProfileGenerationService:
         survey_input: SurveyProfileInput,
     ) -> TasteProfileRevision:
         mapper_version = _active_mapper(self._session)
+        existing_profile = self._session.scalar(
+            select(TasteProfileRevision).where(
+                TasteProfileRevision.external_user_id
+                == survey_input.external_user_id,
+                TasteProfileRevision.survey_response_id
+                == survey_input.survey_response_id,
+                TasteProfileRevision.survey_response_revision
+                == survey_input.response_revision,
+                TasteProfileRevision.mapper_version_id == mapper_version.id,
+            ),
+        )
+        if existing_profile is not None:
+            state = self._session.get(
+                UserProfileState,
+                survey_input.external_user_id,
+            )
+            if state is None:
+                state = UserProfileState(
+                    external_user_id=survey_input.external_user_id,
+                    status=ProfileStatus.ACTIVE.value,
+                    last_survey_response_id=survey_input.survey_response_id,
+                    last_survey_response_revision=survey_input.response_revision,
+                )
+                self._session.add(state)
+            state.active_profile_revision_id = existing_profile.id
+            state.status = ProfileStatus.ACTIVE.value
+            state.last_survey_response_id = survey_input.survey_response_id
+            state.last_survey_response_revision = survey_input.response_revision
+            _ensure_profile_vector(self._session, existing_profile)
+            self._session.flush()
+            return existing_profile
+
         vector_schema = _active_vector_schema(self._session)
         scoring_config = _active_beverage_scoring(self._session)
         generated = self._mapper.map(survey_input)
@@ -217,6 +250,7 @@ class ProfileGenerationService:
             ),
         )
         self._session.add(snapshot)
+        _ensure_profile_vector(self._session, profile, generated=generated)
         state.active_profile_revision_id = profile.id
         state.status = ProfileStatus.ACTIVE.value
         state.last_survey_response_id = survey_input.survey_response_id
@@ -261,6 +295,54 @@ def _active_beverage_scoring(session: Session) -> ScoringConfig:
     if scoring is None:
         raise ValueError("active beverage scoring_v1 config is missing")
     return scoring
+
+
+def _ensure_profile_vector(
+    session: Session,
+    profile: TasteProfileRevision,
+    *,
+    generated: GeneratedProfile | None = None,
+) -> RecommendationVector:
+    source_hash = (
+        generated.source_snapshot_hash
+        if generated is not None
+        else str(profile.generation_metadata_json.get("source_snapshot_hash") or "")
+    )
+    if not source_hash:
+        source_hash = f"profile_revision:{profile.id}"
+    existing = session.scalar(
+        select(RecommendationVector).where(
+            RecommendationVector.owner_type == VectorOwnerType.PROFILE_REVISION.value,
+            RecommendationVector.owner_id == profile.id,
+            RecommendationVector.vector_schema_version_id
+            == profile.vector_schema_version_id,
+            RecommendationVector.source_hash == source_hash,
+        ),
+    )
+    if existing is not None:
+        return existing
+    vector = RecommendationVector(
+        owner_type=VectorOwnerType.PROFILE_REVISION.value,
+        owner_id=profile.id,
+        vector_schema_version_id=profile.vector_schema_version_id,
+        vector=list(generated.taste_vector if generated else profile.taste_vector),
+        vector_json=dict(
+            generated.taste_vector_json if generated else profile.taste_vector_json,
+        ),
+        confidence_json=dict(
+            generated.confidence_json if generated else profile.confidence_json,
+        ),
+        source_hash=source_hash,
+        source_metadata_json={
+            "survey_response_id": profile.survey_response_id,
+            "survey_response_revision": profile.survey_response_revision,
+            "mapper_version_id": str(profile.mapper_version_id),
+            "vector_schema_version_id": str(profile.vector_schema_version_id),
+            "profile_revision": profile.profile_revision,
+        },
+    )
+    session.add(vector)
+    return vector
 
 
 def _add_weights(

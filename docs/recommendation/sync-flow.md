@@ -75,14 +75,62 @@ survey-service durable event source
 This can later move to a message broker without changing event semantics.
 `recommendation-service` MUST NOT use direct survey database access.
 
-Before implementation, confirm the exact SurveyService RPC contract for:
+The V1 sync input is a paginated survey-service event response. It is the
+contract consumed by `recommendation-service`; it is not a survey-service
+database schema.
 
-```text
-ListSurveyEvents(cursor, limit)
-GetSurveyResponse(survey_response_id, response_revision)
+Preferred gRPC contract:
+
+```proto
+service SurveyService {
+  rpc ListSurveyEvents(ListSurveyEventsRequest)
+      returns (ListSurveyEventsResponse);
+  rpc GetSurveyResponse(GetSurveyResponseRequest)
+      returns (GetSurveyResponseResponse);
+}
+
+message ListSurveyEventsRequest {
+  string cursor = 1;
+  int32 limit = 2;
+}
+
+message ListSurveyEventsResponse {
+  string cursor = 1;
+  string next_cursor = 2;
+  bool has_more = 3;
+  string event_watermark = 4;
+  repeated SurveyEvent events = 5;
+}
+
+message SurveyEvent {
+  string event_id = 1;
+  string event_type = 2;
+  google.protobuf.Timestamp occurred_at = 3;
+  string external_user_id = 4;
+  string survey_response_id = 5;
+  string survey_version = 6;
+  int32 response_revision = 7;
+}
+
+message GetSurveyResponseRequest {
+  string survey_response_id = 1;
+  int32 response_revision = 2;
+}
+
+message GetSurveyResponseResponse {
+  string survey_response_id = 1;
+  string external_user_id = 2;
+  string survey_version = 3;
+  int32 response_revision = 4;
+  google.protobuf.Timestamp completed_at = 5;
+  google.protobuf.Struct answers = 6;
+}
 ```
 
-Do not implement sync against survey-service private tables or inferred schemas.
+Until the deployed survey-service proto is available in this repository,
+`recommendation-service` may test against a protocol/fake client and may use an
+explicitly configured internal service API with the same fields. Do not
+implement sync against survey-service private tables or inferred schemas.
 
 ## Event Contract
 
@@ -97,6 +145,25 @@ Minimum survey event:
   "survey_response_id": "surv_resp_123",
   "survey_version": "survey_v1",
   "response_revision": 1
+}
+```
+
+Minimum survey response:
+
+```json
+{
+  "survey_response_id": "surv_resp_123",
+  "external_user_id": "usr_123",
+  "survey_version": "survey_v1",
+  "response_revision": 1,
+  "completed_at": "2026-05-08T12:00:00Z",
+  "answers": {
+    "experience_level": "beginner",
+    "categories": ["whiskey"],
+    "category_traits": {"whiskey": ["vanilla_caramel"]},
+    "global_keywords": ["vanilla_caramel"],
+    "budget_range": "30000_100000"
+  }
 }
 ```
 
