@@ -48,4 +48,10 @@ if [[ "${RUN_QDRANT_SMOKE:-0}" == "1" ]]; then
   python3 -m app.tools.beverage_recommendation_smoke
 fi
 
+if [[ "${RUN_SYNC_SMOKE:-0}" == "1" ]]; then
+  python3 -m app.tools.beverage_import --stage --promote-seed
+  python3 -m app.tools.survey_sync_smoke
+  python3 -m app.tools.venue_recommendation_smoke
+fi
+
 echo "release gate passed reports=$REPORT_DIR"

@@ -131,6 +131,7 @@ Domain docs live here:
 - database model
 - migration strategy
 - release gates and operational runbooks
+- human-required external blockers
 - architectural decisions
 
 ## Source-of-Truth Documents
@@ -141,6 +142,7 @@ Domain docs live here:
 | Codex harness | `../.agent/HARNESS.md` |
 | Domain boundaries | `../.agent/DOMAIN_BOUNDARIES.md` |
 | Repository entry point | `../README.md` |
+| Human-required external blockers | `human-effort.md` |
 | Implementation readiness | `implementation-readiness.md` |
 | Architecture and ownership | `architecture.md` |
 | Map/place ownership | `map-place/ownership.md` |
@@ -218,6 +220,7 @@ docs/
 - README.md
 - architecture.md
 - implementation-readiness.md
+- human-effort.md
 - assistant/
   - assistant-architecture.md
   - rag-policy.md

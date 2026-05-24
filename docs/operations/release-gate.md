@@ -62,6 +62,23 @@ This additionally:
 - runs a beverage recommendation smoke proving serving still uses
   PostgreSQL-hydrated deterministic ranking after the Qdrant rebuild
 
+## Optional Sync Smoke
+
+When local PostgreSQL is running:
+
+```bash
+RUN_DB_SMOKE=1 RUN_SYNC_SMOKE=1 \
+  bash scripts/codex-harness/verify-release-gate.sh
+```
+
+This additionally:
+
+- imports/stages and promotes the reviewed MVP beverage seed
+- runs the fake/protocol survey sync smoke through profile generation and
+  beverage recommendation logging
+- runs the map snapshot import and selected-beverage venue recommendation smoke
+  with place, menu, inventory, and price revisions preserved in logs
+
 ## Rollback Notes
 
 - Catalog rollback: restore the previous seed candidate list or deactivate newly
