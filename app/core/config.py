@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     qdrant_api_key: str | None = None
     qdrant_timeout_seconds: float = 5.0
     qdrant_beverage_collection: str = "beverage_vectors_v1"
+    qdrant_profile_collection: str = "profile_vectors_v1"
     qdrant_venue_collection: str = "venue_vectors_v1"
     qdrant_menu_item_collection: str = "menu_item_vectors_v1"
 
