@@ -5,7 +5,10 @@ from app.models.profile import TasteProfileRevision
 from app.models.vector import RecommendationVector
 from app.models.versioning import ScoringConfig
 from app.repositories.catalog import BeverageVectorCandidate
-from app.services.recommendations import score_beverage_candidate
+from app.services.recommendations import (
+    beverage_model_features,
+    score_beverage_candidate,
+)
 
 
 def test_score_beverage_candidate_is_deterministic_and_explainable() -> None:
@@ -154,3 +157,15 @@ def test_score_beverage_candidate_is_deterministic_and_explainable() -> None:
     assert first.final_score > 0.8
     assert "MATCHES_VANILLA_CARAMEL" in first.reason_codes
     assert "CATEGORY_MATCH" in first.reason_codes
+
+    features = beverage_model_features(
+        profile=profile,
+        candidate=candidate,
+        score=first,
+        scoring_config=scoring,
+    )
+
+    assert features["taste_similarity"] == first.similarity
+    assert features["score_breakdown"] == first.breakdown
+    assert features["candidate_catalog_key"] == "whiskey.test_bourbon"
+    assert features["scoring_config_version"] == "scoring_v1"

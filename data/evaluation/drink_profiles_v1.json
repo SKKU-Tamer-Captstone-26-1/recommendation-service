@@ -1,0 +1,169 @@
+{
+  "version": "drink_profiles_v1",
+  "fixtures": [
+    {
+      "fixture_id": "vanilla_oak_beginner",
+      "profile_name": "Beginner vanilla and oak whiskey profile",
+      "survey_answers": {
+        "experience_level": "beginner",
+        "categories": ["whiskey"],
+        "category_traits": {
+          "whiskey": ["vanilla_caramel", "oak_woody"]
+        },
+        "global_keywords": ["vanilla_caramel", "oak_woody"],
+        "budget_range": "30000_100000"
+      },
+      "expected_categories": ["whiskey"],
+      "expected_styles": ["bourbon", "single malt scotch whisky"],
+      "positive_catalog_keys": [
+        "whiskey.buffalo_trace_bourbon",
+        "whiskey.the_macallan_12_years_double_cask"
+      ],
+      "negative_catalog_keys": [
+        "wine.kim_crawford_sauvignon_blanc",
+        "beer.asahi_super_dry"
+      ],
+      "expected_reason_codes": [
+        "MATCHES_VANILLA_CARAMEL",
+        "CATEGORY_MATCH"
+      ]
+    },
+    {
+      "fixture_id": "bright_white_wine",
+      "profile_name": "Bright citrus white wine profile",
+      "survey_answers": {
+        "experience_level": "beginner",
+        "categories": ["wine"],
+        "category_traits": {
+          "wine": ["citrus_berry"]
+        },
+        "global_keywords": ["citrus_berry", "floral"],
+        "budget_range": "30000_100000"
+      },
+      "expected_categories": ["wine"],
+      "expected_styles": ["white wine"],
+      "positive_catalog_keys": [
+        "wine.kim_crawford_sauvignon_blanc",
+        "wine.cloudy_bay_sauvignon_blanc"
+      ],
+      "negative_catalog_keys": [
+        "whiskey.buffalo_trace_bourbon",
+        "liqueur.baileys_original_irish_cream"
+      ],
+      "expected_reason_codes": [
+        "CATEGORY_MATCH",
+        "MATCHES_FRUITY_BRIGHT_PROFILE"
+      ]
+    },
+    {
+      "fixture_id": "herbal_bitter_cocktail",
+      "profile_name": "Herbal bitter cocktail and gin profile",
+      "survey_answers": {
+        "experience_level": "enthusiast",
+        "categories": ["cocktail", "gin"],
+        "category_traits": {
+          "cocktail": ["herbal_mint", "spirit_forward"],
+          "gin": ["herbal_mint"]
+        },
+        "global_keywords": ["herbal_mint", "spirit_forward"],
+        "budget_range": "30000_100000"
+      },
+      "expected_categories": ["cocktail", "gin"],
+      "expected_styles": ["classic cocktail", "London dry gin", "gin"],
+      "positive_catalog_keys": [
+        "cocktail.negroni",
+        "gin.tanqueray_london_dry_gin",
+        "gin.hendricks_gin"
+      ],
+      "negative_catalog_keys": [
+        "liqueur.baileys_original_irish_cream",
+        "traditional_korean_alcohol.kooksoondang_draft_makgeolli"
+      ],
+      "expected_reason_codes": [
+        "CATEGORY_MATCH",
+        "MATCHES_HERBAL_BITTER_PROFILE"
+      ]
+    },
+    {
+      "fixture_id": "creamy_sweet_liqueur",
+      "profile_name": "Creamy sweet liqueur profile",
+      "survey_answers": {
+        "experience_level": "beginner",
+        "categories": ["liqueur"],
+        "category_traits": {
+          "liqueur": ["vanilla_caramel", "dried_fruit_chocolate", "nutty"]
+        },
+        "global_keywords": ["vanilla_caramel", "dried_fruit_chocolate", "nutty"],
+        "budget_range": "under_70000"
+      },
+      "expected_categories": ["liqueur"],
+      "expected_styles": ["cream liqueur", "coffee liqueur"],
+      "positive_catalog_keys": [
+        "liqueur.baileys_original_irish_cream",
+        "liqueur.kahlua_original_coffee_liqueur"
+      ],
+      "negative_catalog_keys": [
+        "tequila_mezcal.patron_silver_tequila",
+        "wine.cloudy_bay_sauvignon_blanc"
+      ],
+      "expected_reason_codes": [
+        "MATCHES_VANILLA_CARAMEL",
+        "CATEGORY_MATCH"
+      ]
+    },
+    {
+      "fixture_id": "crisp_beer",
+      "profile_name": "Crisp beer profile",
+      "survey_answers": {
+        "experience_level": "beginner",
+        "categories": ["beer"],
+        "category_traits": {
+          "beer": []
+        },
+        "global_keywords": [],
+        "budget_range": "under_70000"
+      },
+      "expected_categories": ["beer"],
+      "expected_styles": ["lager", "stout"],
+      "positive_catalog_keys": [
+        "beer.asahi_super_dry",
+        "beer.guinness_draught"
+      ],
+      "negative_catalog_keys": [
+        "brandy_cognac.hennessy_vsop",
+        "whiskey.the_macallan_12_years_double_cask"
+      ],
+      "expected_reason_codes": [
+        "CATEGORY_MATCH",
+        "BEGINNER_FRIENDLY"
+      ]
+    },
+    {
+      "fixture_id": "korean_soft_sweet",
+      "profile_name": "Soft sweet Korean alcohol profile",
+      "survey_answers": {
+        "experience_level": "beginner",
+        "categories": ["traditional_korean_alcohol"],
+        "category_traits": {
+          "traditional_korean_alcohol": ["sour", "nutty"]
+        },
+        "global_keywords": ["sour", "nutty"],
+        "budget_range": "under_70000"
+      },
+      "expected_categories": ["traditional_korean_alcohol"],
+      "expected_styles": ["makgeolli", "soju"],
+      "positive_catalog_keys": [
+        "traditional_korean_alcohol.kooksoondang_draft_makgeolli",
+        "traditional_korean_alcohol.hwayo_25"
+      ],
+      "negative_catalog_keys": [
+        "whiskey.buffalo_trace_bourbon",
+        "vodka.grey_goose_vodka"
+      ],
+      "expected_reason_codes": [
+        "CATEGORY_MATCH",
+        "BEGINNER_FRIENDLY"
+      ]
+    }
+  ]
+}

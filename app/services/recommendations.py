@@ -247,6 +247,12 @@ class BeverageRecommendationService:
 
         response_items: list[BeverageRecommendationItem] = []
         for index, (candidate, score) in enumerate(ranked, start=1):
+            model_features = beverage_model_features(
+                profile=profile,
+                candidate=candidate,
+                score=score,
+                scoring_config=scoring_config,
+            )
             result = RecommendationResult(
                 request_id=request.id,
                 rank=index,
@@ -255,6 +261,13 @@ class BeverageRecommendationService:
                 similarity_score=score.similarity,
                 final_score=score.final_score,
                 score_breakdown_json=score.breakdown,
+                source_snapshot_json={
+                    "candidate_source": "postgres_catalog",
+                    "catalog_key": _catalog_key(candidate),
+                    "vector_id": str(candidate.vector.id),
+                    "source_hash": candidate.vector.source_hash,
+                    "model_features": model_features,
+                },
                 qdrant_point_id=None,
             )
             self._session.add(result)
@@ -268,6 +281,8 @@ class BeverageRecommendationService:
                 debug_json={
                     "catalog_key": _catalog_key(candidate),
                     "qdrant_used": False,
+                    "candidate_source": "postgres_catalog",
+                    "model_features": model_features,
                 },
             )
             self._session.add(explanation)
@@ -293,6 +308,8 @@ class BeverageRecommendationService:
                         "price_policy": candidate.beverage.metadata_json.get(
                             "price_policy",
                         ),
+                        "candidate_source": "postgres_catalog",
+                        "model_features": model_features,
                     },
                 ),
             )
@@ -525,6 +542,39 @@ def score_beverage_candidate(
         reason_codes=reason_codes,
         explanation=_explanation(candidate, reason_codes),
     )
+
+
+def beverage_model_features(
+    *,
+    profile: TasteProfileRevision,
+    candidate: BeverageVectorCandidate,
+    score: ScoreComputation,
+    scoring_config: ScoringConfig,
+) -> dict[str, Any]:
+    """Return model-ready, deterministic features used to score a beverage."""
+
+    return {
+        "taste_similarity": score.similarity,
+        "category_fit": round(_category_fit(profile, candidate), 6),
+        "budget_fit": 0.5,
+        "experience_fit": round(_experience_fit(profile, candidate), 6),
+        "popularity_or_quality": round(_popularity_or_quality(candidate), 6),
+        "diversity_adjustment": 0.5,
+        "score_breakdown": score.breakdown,
+        "final_score": score.final_score,
+        "matched_dimensions": score.matched_dimensions,
+        "reason_codes": score.reason_codes,
+        "profile_revision": profile.profile_revision,
+        "profile_revision_id": str(profile.id) if profile.id else None,
+        "vector_schema_version_id": str(profile.vector_schema_version_id),
+        "scoring_config_version": scoring_config.version,
+        "candidate_catalog_key": _catalog_key(candidate),
+        "candidate_category": candidate.beverage.category,
+        "candidate_style": _style(candidate),
+        "candidate_vector_id": (
+            str(candidate.vector.id) if candidate.vector.id else None
+        ),
+    }
 
 
 def rank_venue_candidates(
