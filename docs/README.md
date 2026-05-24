@@ -130,6 +130,7 @@ Domain docs live here:
 - API contracts
 - database model
 - migration strategy
+- release gates and operational runbooks
 - architectural decisions
 
 ## Source-of-Truth Documents
@@ -159,6 +160,7 @@ Domain docs live here:
 | API contracts | `api/recommendation-api.md` |
 | PostgreSQL and Qdrant metadata model | `database/erd.md` |
 | Migration rules | `database/migration-strategy.md` |
+| Release gate | `operations/release-gate.md` |
 | Derived-state decision | `decisions/adr-001-derived-state.md` |
 
 ## Reading Order
@@ -239,6 +241,8 @@ docs/
 - database/
   - erd.md
   - migration-strategy.md
+- operations/
+  - release-gate.md
 - decisions/
   - adr-001-derived-state.md
 ```
