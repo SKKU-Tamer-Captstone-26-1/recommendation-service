@@ -25,14 +25,29 @@ def test_current_seed_subset_passes_critical_catalog_audit() -> None:
     report = audit_seed_records(records)
 
     assert report.critical_count == 0
-    assert report.metrics["active_beverages"] == 24
-    assert report.metrics["recommendation_vectors"] == 24
-    assert report.metrics["flavor_profiles"] == 24
+    assert report.metrics["active_beverages"] == 60
+    assert report.metrics["recommendation_vectors"] == 60
+    assert report.metrics["flavor_profiles"] == 60
     assert report.metrics["complete_vector_coverage"] == 1.0
     assert report.metrics["confidence_coverage"] == 1.0
     assert report.metrics["source_metadata_coverage"] == 1.0
-    assert report.metrics["reason_code_coverage"] >= 0.5
-    assert set(report.metrics["category_counts"]) >= {"whiskey", "wine", "beer"}
+    assert report.metrics["reason_code_coverage"] >= 0.95
+    assert report.metrics["alias_coverage"] >= 0.95
+    assert report.metrics["style_coverage"] == 1.0
+    assert report.metrics["category_counts"] == {
+        "beer": 5,
+        "brandy_cognac": 5,
+        "cocktail": 5,
+        "gin": 5,
+        "liqueur": 5,
+        "rum": 5,
+        "sake_shochu": 5,
+        "tequila_mezcal": 5,
+        "traditional_korean_alcohol": 5,
+        "vodka": 5,
+        "whiskey": 5,
+        "wine": 5,
+    }
 
 
 def test_catalog_audit_detects_missing_vector_and_metadata() -> None:

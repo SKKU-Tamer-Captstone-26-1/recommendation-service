@@ -33,28 +33,64 @@ STAGING_NAMESPACE = uuid.UUID("2020c0be-0d4a-53b0-a6cd-37e85f7bffcf")
 MVP_SEED_CANDIDATE_IDS: tuple[str, ...] = (
     "bev_cand_beer_guinness_draught",
     "bev_cand_beer_asahi_super_dry",
+    "bev_cand_beer_heineken_original",
+    "bev_cand_beer_corona_extra",
+    "bev_cand_beer_hoegaarden_original_white_ale",
     "bev_cand_brandy_cognac_hennessy_vsop",
     "bev_cand_brandy_cognac_remy_martin_vsop",
+    "bev_cand_brandy_cognac_courvoisier_vsop",
+    "bev_cand_brandy_cognac_martell_cordon_bleu",
+    "bev_cand_brandy_cognac_camus_vsop_cognac",
     "bev_cand_cocktail_negroni",
     "bev_cand_cocktail_margarita",
+    "bev_cand_cocktail_dry_martini",
+    "bev_cand_cocktail_mojito",
+    "bev_cand_cocktail_daiquiri",
     "bev_cand_gin_tanqueray_london_dry_gin",
     "bev_cand_gin_hendricks_gin",
+    "bev_cand_gin_beefeater_london_dry_gin",
+    "bev_cand_gin_bombay_sapphire_gin",
+    "bev_cand_gin_gordon_s_london_dry_gin",
     "bev_cand_liqueur_baileys_original_irish_cream",
     "bev_cand_liqueur_kahlua_original_coffee_liqueur",
+    "bev_cand_liqueur_cointreau",
+    "bev_cand_liqueur_grand_marnier_cordon_rouge",
+    "bev_cand_liqueur_aperol",
     "bev_cand_rum_bacardi_carta_blanca",
+    "bev_cand_rum_appleton_estate_signature",
     "bev_cand_rum_havana_club_3_year_old",
+    "bev_cand_rum_captain_morgan_original_spiced_gold",
+    "bev_cand_rum_mount_gay_eclipse",
     "bev_cand_sake_shochu_dassai_45",
     "bev_cand_sake_shochu_iichiko_silhouette",
+    "bev_cand_sake_shochu_kubota_senju",
+    "bev_cand_sake_shochu_hakkaisan_tokubetsu_junmai",
+    "bev_cand_sake_shochu_hakutsuru_sayuri_nigori",
     "bev_cand_tequila_mezcal_patron_silver_tequila",
+    "bev_cand_tequila_mezcal_del_maguey_vida_puebla_mezcal",
     "bev_cand_tequila_mezcal_don_julio_blanco",
+    "bev_cand_tequila_mezcal_don_julio_1942",
+    "bev_cand_tequila_mezcal_jose_cuervo_especial_silver",
     "bev_cand_traditional_korean_alcohol_hwayo_25",
     "bev_cand_traditional_korean_alcohol_kooksoondang_draft_makgeolli",
+    "bev_cand_traditional_korean_alcohol_jinro_chamisul_fresh",
+    "bev_cand_traditional_korean_alcohol_jinro_is_back",
+    "bev_cand_traditional_korean_alcohol_chum_churum_original",
     "bev_cand_vodka_absolut_vodka",
     "bev_cand_vodka_grey_goose_vodka",
+    "bev_cand_vodka_smirnoff_no_21_vodka",
+    "bev_cand_vodka_belvedere_vodka",
+    "bev_cand_vodka_ketel_one_vodka",
     "bev_cand_whiskey_the_macallan_12_years_double_cask",
     "bev_cand_whiskey_buffalo_trace_bourbon",
+    "bev_cand_whiskey_laphroaig_10_year_old",
+    "bev_cand_whiskey_jameson_irish_whiskey",
+    "bev_cand_whiskey_glenfiddich_12_year_old",
     "bev_cand_wine_kim_crawford_sauvignon_blanc",
     "bev_cand_wine_cloudy_bay_sauvignon_blanc",
+    "bev_cand_wine_louis_jadot_beaujolais_villages",
+    "bev_cand_wine_santa_margherita_pinot_grigio",
+    "bev_cand_wine_robert_mondavi_private_selection_cabernet_sauvignon",
 )
 
 
@@ -511,7 +547,50 @@ def _reason_code_hints(
         hints.append("MATCHES_FRUITY_BRIGHT_PROFILE")
     if dimensions.get("herbal", 0) >= 0.5 or dimensions.get("bitterness", 0) >= 0.5:
         hints.append("MATCHES_HERBAL_BITTER_PROFILE")
+    if dimensions.get("woody", 0) >= 0.5 and dimensions.get("body", 0) >= 0.5:
+        hints.append("MATCHES_RICH_OAK_PROFILE")
+    if dimensions.get("body", 0) >= 0.55 and (
+        dimensions.get("sweet", 0) >= 0.45
+        or dimensions.get("fruity", 0) >= 0.45
+        or dimensions.get("spicy", 0) >= 0.45
+    ):
+        hints.append("MATCHES_ROUNDED_BODY")
+    if dimensions.get("roasted", 0) >= 0.5:
+        hints.append("MATCHES_ROASTED_PROFILE")
+    if extended.get("earthy", 0) >= 0.5:
+        hints.append("MATCHES_EARTHY_AGAVE_PROFILE")
+    if _clean_light_profile(catalog, dimensions):
+        hints.append("MATCHES_CLEAN_LIGHT_PROFILE")
     return sorted(set(hints))
+
+
+def _clean_light_profile(
+    catalog: dict[str, Any],
+    dimensions: dict[str, Any],
+) -> bool:
+    clean_categories = {"sake_shochu", "traditional_korean_alcohol", "vodka"}
+    if catalog.get("category") in clean_categories:
+        expressive_dimensions = (
+            "sweet",
+            "fruity",
+            "dried_fruit",
+            "woody",
+            "smoky",
+            "nutty",
+            "floral",
+            "spicy",
+            "herbal",
+            "body",
+            "acidity",
+            "bitterness",
+            "tannin",
+            "roasted",
+        )
+        return all(
+            float(dimensions.get(name, 0.0)) < 0.45
+            for name in expressive_dimensions
+        )
+    return False
 
 
 def _catalog_metadata(
@@ -529,8 +608,8 @@ def _catalog_metadata(
         "source_type": "operator_reviewed_candidate_seed",
         "source_version": SEED_VERSION,
         "curation_status": "approved_mvp_seed",
-        "aliases_en": catalog.get("aliases_en", []),
-        "aliases_ko": catalog.get("aliases_ko", []),
+        "aliases_en": _aliases(catalog, "aliases_en", "canonical_name_en"),
+        "aliases_ko": _aliases(catalog, "aliases_ko", "display_name_ko"),
         "serving_context": catalog.get("serving_style", []),
         "popularity_hint": catalog.get("popularity_hint"),
         "korea_availability_hint": catalog.get("korea_availability_hint"),
@@ -541,6 +620,22 @@ def _catalog_metadata(
         "extended_dimension_values": flavor.get("extended_dimension_values", {}),
         "price_policy": "candidate_price_observations_not_live_truth",
     }
+
+
+def _aliases(
+    catalog: dict[str, Any],
+    aliases_key: str,
+    fallback_key: str,
+) -> list[str]:
+    aliases = [
+        alias
+        for alias in catalog.get(aliases_key, [])
+        if isinstance(alias, str) and alias
+    ]
+    fallback = catalog.get(fallback_key)
+    if isinstance(fallback, str) and fallback and fallback not in aliases:
+        aliases.append(fallback)
+    return aliases
 
 
 def _flavor_tags(catalog: dict[str, Any], flavor: dict[str, Any]) -> list[str]:

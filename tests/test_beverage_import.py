@@ -19,24 +19,34 @@ def test_canonical_seed_subset_builds_reviewed_records() -> None:
         vector_schema_version_id=schema_id,
     )
 
-    assert len(records) == 24
-    assert len(MVP_SEED_CANDIDATE_IDS) == 24
-    assert {record.beverage.category for record in records} == {
-        "beer",
-        "brandy_cognac",
-        "cocktail",
-        "gin",
-        "liqueur",
-        "rum",
-        "sake_shochu",
-        "tequila_mezcal",
-        "traditional_korean_alcohol",
-        "vodka",
-        "whiskey",
-        "wine",
+    assert len(records) == 60
+    assert len(MVP_SEED_CANDIDATE_IDS) == 60
+    category_counts = {}
+    for record in records:
+        category_counts[record.beverage.category] = (
+            category_counts.get(record.beverage.category, 0) + 1
+        )
+    assert category_counts == {
+        "beer": 5,
+        "brandy_cognac": 5,
+        "cocktail": 5,
+        "gin": 5,
+        "liqueur": 5,
+        "rum": 5,
+        "sake_shochu": 5,
+        "tequila_mezcal": 5,
+        "traditional_korean_alcohol": 5,
+        "vodka": 5,
+        "whiskey": 5,
+        "wine": 5,
     }
     assert all(record.beverage.active for record in records)
     assert all(record.beverage.price_min_krw is None for record in records)
+    assert all(record.beverage.metadata_json["aliases_en"] for record in records)
+    assert all(record.beverage.metadata_json["aliases_ko"] for record in records)
+    assert all(
+        record.beverage.metadata_json["reason_code_hints"] for record in records
+    )
     assert all(
         record.vector.owner_type == VectorOwnerType.BEVERAGE_ITEM.value
         for record in records

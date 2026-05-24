@@ -200,8 +200,10 @@ recommendation only when the score breakdown supports it.
 
 ## Seed Data Format
 
-MVP seed data SHOULD contain 10-20 beverages covering the main initial
-categories and vector dimensions.
+MVP seed data SHOULD start with 10-20 beverages covering the main initial
+categories and vector dimensions. Beta-readiness expansion SHOULD grow the
+active reviewed seed to 50-75 beverages after catalog audit and evaluation
+coverage exist.
 
 Recommended seed location:
 
@@ -269,6 +271,10 @@ Initial seed set SHOULD cover:
 - 2-3 cocktails or cocktail archetypes
 - 1-2 Korean alcohol examples such as soju or makgeolli
 - 1-2 sake or liqueur examples if useful for survey coverage
+
+The beta seed target from `docs/plans/009.md` SHOULD cover at least five
+reviewed beverages per active MVP category before relying on live map/place
+availability data.
 
 Seed import MUST be idempotent. Re-running it must not duplicate catalog items,
 flavor profiles, or vectors.
