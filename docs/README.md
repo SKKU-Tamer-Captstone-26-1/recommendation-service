@@ -168,6 +168,7 @@ Domain docs live here:
 | Production metrics | `operations/metrics.md` |
 | Load test plan | `operations/load-tests/README.md` |
 | Training dataset export | `operations/training-dataset.md` |
+| MLflow proof of concept | `operations/mlflow-poc.md` |
 | Korean technical record | `tech-kr/README.md` |
 | Derived-state decision | `decisions/adr-001-derived-state.md` |
 
@@ -255,6 +256,7 @@ docs/
   - runbooks.md
   - metrics.md
   - training-dataset.md
+  - mlflow-poc.md
   - load-tests/
     - README.md
     - result-template.md
