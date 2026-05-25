@@ -95,7 +95,7 @@ def build_training_dataset_export(
         ],
         "source_boundary": (
             "recommendation-owned logs and derived profile metadata only; "
-            "raw survey answers and external service databases are excluded"
+            "raw survey answers and external service storage are excluded"
         ),
     }
     return TrainingDatasetExport(
@@ -299,9 +299,9 @@ def _feature_schema() -> dict[str, Any]:
         },
         "excluded_sources": [
             "raw survey answers",
-            "survey-service database",
-            "map-service database",
-            "auth-service database",
+            "survey-service raw storage",
+            "map-service canonical storage",
+            "auth-service identity storage",
         ],
     }
 

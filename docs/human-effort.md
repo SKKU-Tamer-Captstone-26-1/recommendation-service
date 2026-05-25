@@ -2,9 +2,9 @@
 
 ## Purpose
 
-This file records plan 009 work that cannot be completed from this repository
-alone because it requires deployed external services, credentials, or production
-policy decisions.
+This file records plan 009 and plan 010 work that cannot be completed from this
+repository alone because it requires deployed external services, credentials, or
+production policy decisions.
 
 ## Open Items
 
@@ -99,6 +99,33 @@ Acceptance evidence when unblocked:
 
 ```text
 chat_recommendation_deployed_smoke = pass
+```
+
+### Deployed Recommendation-Service Smoke
+
+Status: external dependency required.
+
+Current repo evidence:
+
+- The deployed smoke harness can call a configured recommendation-service gRPC
+  endpoint with bearer metadata.
+- Local release gates prove deterministic beverage and venue recommendation
+  behavior with recommendation-owned data and map snapshot read models.
+- The smoke harness skips clearly when deployed endpoint and credential
+  environment variables are not configured.
+
+Human-provided inputs needed:
+
+- deployed recommendation-service gRPC address
+- TLS mode for the deployed gRPC endpoint
+- auth metadata or internal service credential required for the smoke
+- safe test user ID with an active derived profile
+- optional safe selected beverage ID and location for venue recommendation smoke
+
+Acceptance evidence when unblocked:
+
+```text
+recommendation_deployed_smoke = pass
 ```
 
 ## Non-Blocking Operational Note
