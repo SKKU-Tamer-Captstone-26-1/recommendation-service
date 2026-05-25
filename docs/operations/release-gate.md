@@ -124,6 +124,7 @@ The HTTP API exposes:
 
 ```text
 GET /v1/operations/metrics
+GET /v1/operations/metrics/prometheus
 ```
 
 The response is intentionally flat and machine-readable for beta operations. It
@@ -133,6 +134,11 @@ latency counters when the running process has served recommendation requests.
 The endpoint does not read survey-service or map-service databases. Survey and
 map health are represented only through recommendation-owned sync event tables,
 dead letters, cursors, and map snapshot read-model state.
+
+The Prometheus endpoint renders the same recommendation-owned operational state
+plus process-local runtime latency histograms and gRPC status counters. It is
+intended for staging/production scraping and must not block serving if scraping
+fails.
 
 ## Rollback Notes
 

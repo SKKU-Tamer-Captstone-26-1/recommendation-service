@@ -12,6 +12,7 @@ from app.main import app
 from app.services.operational_metrics import (
     OperationalMetricsService,
     OperationalMetricsSnapshot,
+    render_prometheus_metrics,
 )
 from app.services.runtime_metrics import RuntimeOperationSnapshot
 
@@ -25,8 +26,11 @@ def test_operational_metrics_snapshot_calculates_beta_health_metrics() -> None:
             "beverage_recommendation": RuntimeOperationSnapshot(
                 count=4,
                 error_count=1,
+                total_latency_ms=50.0,
                 average_latency_ms=12.5,
                 max_latency_ms=25.0,
+                latency_bucket_counts={"50": 4, "100": 4},
+                status_counts={"ok": 3, "error": 1},
             ),
         },
     )
@@ -46,6 +50,8 @@ def test_operational_metrics_snapshot_calculates_beta_health_metrics() -> None:
     assert (
         snapshot.metrics["runtime_beverage_recommendation_average_latency_ms"] == 12.5
     )
+    assert snapshot.metrics["runtime_beverage_recommendation_status_ok_count"] == 3
+    assert snapshot.metrics["runtime_beverage_recommendation_status_error_count"] == 1
 
 
 def test_operations_metrics_endpoint_returns_flat_metrics(monkeypatch) -> None:
@@ -81,6 +87,70 @@ def test_operations_metrics_endpoint_returns_flat_metrics(monkeypatch) -> None:
     assert payload["service"] == "recommendation-service"
     assert payload["metrics"]["recommendation_request_count"] == 3
     assert payload["metrics"]["qdrant_failed_point_count"] == 0
+
+
+def test_operations_metrics_prometheus_endpoint_returns_text(monkeypatch) -> None:
+    generated_at = datetime(2026, 5, 24, 12, 0, tzinfo=UTC)
+
+    class _FakeService:
+        def snapshot(self) -> OperationalMetricsSnapshot:
+            return OperationalMetricsSnapshot(
+                generated_at=generated_at,
+                metrics={
+                    "recommendation_request_count": 3,
+                    "qdrant_failed_point_count": 0,
+                },
+            )
+
+    monkeypatch.setattr(
+        operations.OperationalMetricsService,
+        "from_session",
+        classmethod(lambda cls, session: _FakeService()),
+    )
+
+    def _override_db():
+        yield object()
+
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        response = TestClient(app).get("/v1/operations/metrics/prometheus")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/plain")
+    assert "recommendation_operational_metric" in response.text
+    assert 'name="recommendation_request_count"' in response.text
+    assert " 3\n" in response.text
+
+
+def test_prometheus_renderer_includes_runtime_histogram_and_grpc_status() -> None:
+    snapshot = OperationalMetricsSnapshot(
+        generated_at=datetime(2026, 5, 24, 12, 0, tzinfo=UTC),
+        metrics={"recommendation_request_count": 2},
+    )
+    text = render_prometheus_metrics(
+        snapshot,
+        service="recommendation-service",
+        environment="test",
+        runtime_snapshot={
+            "grpc_GetBeverageRecommendations": RuntimeOperationSnapshot(
+                count=2,
+                error_count=1,
+                total_latency_ms=150.0,
+                average_latency_ms=75.0,
+                max_latency_ms=100.0,
+                latency_bucket_counts={"50": 1, "100": 2},
+                status_counts={"ok": 1, "error": 1},
+            ),
+        },
+    )
+
+    assert "recommendation_runtime_latency_ms_bucket" in text
+    assert 'operation="grpc_GetBeverageRecommendations"' in text
+    assert "recommendation_grpc_status_total" in text
+    assert 'method="GetBeverageRecommendations"' in text
+    assert 'status="error"' in text
 
 
 def test_json_log_formatter_includes_structured_payload() -> None:

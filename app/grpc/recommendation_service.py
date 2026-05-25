@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
+from time import perf_counter
 
 import grpc
 from google.protobuf import json_format
@@ -13,6 +14,7 @@ from app.services.recommendations import (
     BeverageRecommendationService,
     RecommendationPreconditionError,
 )
+from app.services.runtime_metrics import runtime_metrics
 
 
 class RecommendationGrpcServicer(recommendation_pb2_grpc.RecommendationServiceServicer):
@@ -25,40 +27,42 @@ class RecommendationGrpcServicer(recommendation_pb2_grpc.RecommendationServiceSe
         self._auth_resolver = auth_resolver
 
     def GetProfileStatus(self, request, context):
-        external_user_id = self._resolve_external_user_id(context)
-        with self._session_factory() as session:
-            service = BeverageRecommendationService(session)
-            status = service.get_profile_status(external_user_id)
-            response = recommendation_pb2.GetProfileStatusResponse(
-                status=_profile_status_to_proto(status.status),
-                profile_revision=status.profile_revision or 0,
-                survey_response_id=status.survey_response_id or "",
-                stale_reason=status.stale_reason or "",
-            )
-            if status.generated_at:
-                response.generated_at.FromDatetime(status.generated_at)
-            return response
+        started_at = perf_counter()
+        try:
+            external_user_id = self._resolve_external_user_id(context)
+            with self._session_factory() as session:
+                service = BeverageRecommendationService(session)
+                status = service.get_profile_status(external_user_id)
+                response = recommendation_pb2.GetProfileStatusResponse(
+                    status=_profile_status_to_proto(status.status),
+                    profile_revision=status.profile_revision or 0,
+                    survey_response_id=status.survey_response_id or "",
+                    stale_reason=status.stale_reason or "",
+                )
+                if status.generated_at:
+                    response.generated_at.FromDatetime(status.generated_at)
+                _record_grpc_status("GetProfileStatus", "ok", started_at)
+                return response
+        except Exception:
+            _record_grpc_status("GetProfileStatus", "error", started_at)
+            raise
 
     def GetBeverageRecommendations(self, request, context):
-        external_user_id = self._resolve_external_user_id(context)
-        budget_mode = _budget_mode_from_proto(request.budget_mode)
-        with self._session_factory() as session:
+        started_at = perf_counter()
+        session = None
+        try:
+            external_user_id = self._resolve_external_user_id(context)
+            budget_mode = _budget_mode_from_proto(request.budget_mode)
+            session = self._session_factory()
             service = BeverageRecommendationService(session)
-            try:
-                response = service.get_beverage_recommendations(
-                    external_user_id=external_user_id,
-                    category=request.category or None,
-                    limit=request.limit or None,
-                    budget_mode=budget_mode,
-                )
-                session.commit()
-            except RecommendationPreconditionError as exc:
-                session.rollback()
-                context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(exc))
-            except Exception:
-                session.rollback()
-                raise
-
+            response = service.get_beverage_recommendations(
+                external_user_id=external_user_id,
+                category=request.category or None,
+                limit=request.limit or None,
+                budget_mode=budget_mode,
+            )
+            session.commit()
+            _record_grpc_status("GetBeverageRecommendations", "ok", started_at)
             return recommendation_pb2.GetBeverageRecommendationsResponse(
                 request_id=str(response.request_id) if response.request_id else "",
                 profile_status=_profile_status_to_proto(response.profile_status),
@@ -67,33 +71,43 @@ class RecommendationGrpcServicer(recommendation_pb2_grpc.RecommendationServiceSe
                     _recommendation_to_proto(item) for item in response.results
                 ],
             )
+        except RecommendationPreconditionError as exc:
+            if session is not None:
+                session.rollback()
+            _record_grpc_status(
+                "GetBeverageRecommendations",
+                "failed_precondition",
+                started_at,
+            )
+            context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(exc))
+        except Exception:
+            if session is not None:
+                session.rollback()
+            _record_grpc_status("GetBeverageRecommendations", "error", started_at)
+            raise
+        finally:
+            if session is not None:
+                session.close()
 
     def GetVenueRecommendations(self, request, context):
-        external_user_id = self._resolve_external_user_id(context)
-        budget_mode = _budget_mode_from_proto(request.budget_mode)
-        with self._session_factory() as session:
+        started_at = perf_counter()
+        session = None
+        try:
+            external_user_id = self._resolve_external_user_id(context)
+            budget_mode = _budget_mode_from_proto(request.budget_mode)
+            session = self._session_factory()
             service = BeverageRecommendationService(session)
-            try:
-                response = service.get_venue_recommendations(
-                    external_user_id=external_user_id,
-                    selected_beverage_id=request.selected_beverage_id,
-                    lat=request.lat,
-                    lng=request.lng,
-                    radius_m=request.radius_m or None,
-                    limit=request.limit or None,
-                    budget_mode=budget_mode,
-                )
-                session.commit()
-            except RecommendationPreconditionError as exc:
-                session.rollback()
-                context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(exc))
-            except ValueError as exc:
-                session.rollback()
-                context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
-            except Exception:
-                session.rollback()
-                raise
-
+            response = service.get_venue_recommendations(
+                external_user_id=external_user_id,
+                selected_beverage_id=request.selected_beverage_id,
+                lat=request.lat,
+                lng=request.lng,
+                radius_m=request.radius_m or None,
+                limit=request.limit or None,
+                budget_mode=budget_mode,
+            )
+            session.commit()
+            _record_grpc_status("GetVenueRecommendations", "ok", started_at)
             return recommendation_pb2.GetVenueRecommendationsResponse(
                 request_id=str(response.request_id) if response.request_id else "",
                 profile_status=_profile_status_to_proto(response.profile_status),
@@ -102,35 +116,75 @@ class RecommendationGrpcServicer(recommendation_pb2_grpc.RecommendationServiceSe
                     _venue_recommendation_to_proto(item) for item in response.results
                 ],
             )
+        except RecommendationPreconditionError as exc:
+            if session is not None:
+                session.rollback()
+            _record_grpc_status(
+                "GetVenueRecommendations",
+                "failed_precondition",
+                started_at,
+            )
+            context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(exc))
+        except ValueError as exc:
+            if session is not None:
+                session.rollback()
+            _record_grpc_status(
+                "GetVenueRecommendations",
+                "invalid_argument",
+                started_at,
+            )
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
+        except Exception:
+            if session is not None:
+                session.rollback()
+            _record_grpc_status("GetVenueRecommendations", "error", started_at)
+            raise
+        finally:
+            if session is not None:
+                session.close()
 
     def RecordRecommendationEvent(self, request, context):
-        self._resolve_external_user_id(context)
-        metadata = json_format.MessageToDict(
-            request.metadata,
-            preserving_proto_field_name=True,
-        )
-        result_id = uuid.UUID(request.result_id) if request.result_id else None
-        with self._session_factory() as session:
+        started_at = perf_counter()
+        session = None
+        try:
+            self._resolve_external_user_id(context)
+            metadata = json_format.MessageToDict(
+                request.metadata,
+                preserving_proto_field_name=True,
+            )
+            result_id = uuid.UUID(request.result_id) if request.result_id else None
+            session = self._session_factory()
             service = BeverageRecommendationService(session)
-            try:
-                response = service.record_interaction(
-                    request_id=uuid.UUID(request.request_id),
-                    result_id=result_id,
-                    event_type=_event_type_from_proto(request.event_type),
-                    idempotency_key=request.idempotency_key or None,
-                    metadata=metadata,
-                )
-                session.commit()
-            except ValueError as exc:
-                session.rollback()
-                context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
-            except Exception:
-                session.rollback()
-                raise
+            response = service.record_interaction(
+                request_id=uuid.UUID(request.request_id),
+                result_id=result_id,
+                event_type=_event_type_from_proto(request.event_type),
+                idempotency_key=request.idempotency_key or None,
+                metadata=metadata,
+            )
+            session.commit()
+            _record_grpc_status("RecordRecommendationEvent", "ok", started_at)
             return recommendation_pb2.RecordRecommendationEventResponse(
                 interaction_id=str(response.interaction_id),
                 duplicate=response.duplicate,
             )
+        except ValueError as exc:
+            if session is not None:
+                session.rollback()
+            _record_grpc_status(
+                "RecordRecommendationEvent",
+                "invalid_argument",
+                started_at,
+            )
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
+        except Exception:
+            if session is not None:
+                session.rollback()
+            _record_grpc_status("RecordRecommendationEvent", "error", started_at)
+            raise
+        finally:
+            if session is not None:
+                session.close()
 
     def _resolve_external_user_id(self, context) -> str:
         try:
@@ -243,3 +297,12 @@ def _venue_freshness_to_proto(value: str) -> int:
         "stale": recommendation_pb2.VENUE_FRESHNESS_STATUS_STALE,
         "expired": recommendation_pb2.VENUE_FRESHNESS_STATUS_EXPIRED,
     }.get(value, recommendation_pb2.VENUE_FRESHNESS_STATUS_UNSPECIFIED)
+
+
+def _record_grpc_status(method: str, status: str, started_at: float) -> None:
+    runtime_metrics.record(
+        f"grpc_{method}",
+        latency_ms=round((perf_counter() - started_at) * 1000, 3),
+        error=status != "ok",
+        status=status,
+    )

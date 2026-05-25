@@ -114,16 +114,19 @@ class OperationalMetricsService:
         *,
         catalog_audit: CatalogAuditProvider | None = None,
         runtime_snapshot: dict[str, RuntimeOperationSnapshot] | None = None,
+        extra_metrics: dict[str, MetricValue] | None = None,
     ) -> None:
         self._repository = repository
         self._catalog_audit = catalog_audit
         self._runtime_snapshot = runtime_snapshot
+        self._extra_metrics = extra_metrics or {}
 
     @classmethod
     def from_session(cls, session: Session) -> OperationalMetricsService:
         return cls(
             SqlOperationalMetricsRepository(session),
             catalog_audit=BeverageCatalogAuditService(session),
+            extra_metrics=_db_pool_metrics(session),
         )
 
     def snapshot(self, now: datetime | None = None) -> OperationalMetricsSnapshot:
@@ -204,6 +207,7 @@ class OperationalMetricsService:
         }
         metrics.update(_catalog_audit_metrics(self._catalog_audit))
         metrics.update(_runtime_metrics(self._runtime_snapshot))
+        metrics.update(self._extra_metrics)
         return OperationalMetricsSnapshot(generated_at=resolved_now, metrics=metrics)
 
 
@@ -231,11 +235,91 @@ def _runtime_metrics(
         prefix = f"runtime_{operation}"
         metrics[f"{prefix}_request_count"] = operation_snapshot.count
         metrics[f"{prefix}_error_count"] = operation_snapshot.error_count
+        metrics[f"{prefix}_total_latency_ms"] = operation_snapshot.total_latency_ms
         metrics[f"{prefix}_average_latency_ms"] = (
             operation_snapshot.average_latency_ms
         )
         metrics[f"{prefix}_max_latency_ms"] = operation_snapshot.max_latency_ms
+        for status, count in operation_snapshot.status_counts.items():
+            metrics[f"{prefix}_status_{_metric_key(status)}_count"] = count
     return metrics
+
+
+def render_prometheus_metrics(
+    snapshot: OperationalMetricsSnapshot,
+    *,
+    service: str,
+    environment: str,
+    runtime_snapshot: dict[str, RuntimeOperationSnapshot] | None = None,
+) -> str:
+    labels = {
+        "service": service,
+        "environment": environment,
+    }
+    lines = [
+        "# HELP recommendation_operational_metric "
+        "Recommendation service operational metric.",
+        "# TYPE recommendation_operational_metric gauge",
+    ]
+    for name, value in sorted(snapshot.metrics.items()):
+        if value is None:
+            continue
+        metric_labels = {**labels, "name": name}
+        lines.append(
+            "recommendation_operational_metric"
+            f"{_labels(metric_labels)} {_number(value)}",
+        )
+
+    resolved_runtime = runtime_snapshot if runtime_snapshot is not None else (
+        runtime_metrics.snapshot()
+    )
+    lines.extend(
+        [
+            "# HELP recommendation_runtime_latency_ms "
+            "Runtime operation latency histogram.",
+            "# TYPE recommendation_runtime_latency_ms histogram",
+        ],
+    )
+    for operation, item in sorted(resolved_runtime.items()):
+        for bucket, count in sorted(
+            item.latency_bucket_counts.items(),
+            key=lambda pair: float(pair[0]),
+        ):
+            lines.append(
+                "recommendation_runtime_latency_ms_bucket"
+                f"{_labels({**labels, 'operation': operation, 'le': bucket})} {count}",
+            )
+        lines.append(
+            "recommendation_runtime_latency_ms_bucket"
+            f"{_labels({**labels, 'operation': operation, 'le': '+Inf'})} "
+            f"{item.count}",
+        )
+        lines.append(
+            "recommendation_runtime_latency_ms_count"
+            f"{_labels({**labels, 'operation': operation})} {item.count}",
+        )
+        lines.append(
+            "recommendation_runtime_latency_ms_sum"
+            f"{_labels({**labels, 'operation': operation})} "
+            f"{_number(item.total_latency_ms)}",
+        )
+
+    lines.extend(
+        [
+            "# HELP recommendation_grpc_status_total gRPC method status count.",
+            "# TYPE recommendation_grpc_status_total counter",
+        ],
+    )
+    for operation, item in sorted(resolved_runtime.items()):
+        if not operation.startswith("grpc_"):
+            continue
+        method = operation.removeprefix("grpc_")
+        for status, count in sorted(item.status_counts.items()):
+            lines.append(
+                "recommendation_grpc_status_total"
+                f"{_labels({**labels, 'method': method, 'status': status})} {count}",
+            )
+    return "\n".join(lines) + "\n"
 
 
 def _rate(numerator: int, denominator: int) -> float | None:
@@ -254,3 +338,50 @@ def _aware(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
     return value.astimezone(UTC)
+
+
+def _db_pool_metrics(session: Session) -> dict[str, MetricValue]:
+    bind = session.get_bind()
+    pool = getattr(bind, "pool", None)
+    if pool is None:
+        return {}
+    return {
+        "db_pool_size": _call_pool_metric(pool, "size"),
+        "db_pool_checked_out": _call_pool_metric(pool, "checkedout"),
+        "db_pool_checked_in": _call_pool_metric(pool, "checkedin"),
+        "db_pool_overflow": _call_pool_metric(pool, "overflow"),
+    }
+
+
+def _call_pool_metric(pool: Any, method: str) -> int | None:
+    value = getattr(pool, method, None)
+    if not callable(value):
+        return None
+    try:
+        result = value()
+    except NotImplementedError:
+        return None
+    if isinstance(result, int):
+        return result
+    return None
+
+
+def _metric_key(value: str) -> str:
+    return "".join(character if character.isalnum() else "_" for character in value)
+
+
+def _labels(labels: dict[str, str]) -> str:
+    rendered = ",".join(
+        f'{key}="{_escape_label(value)}"' for key, value in sorted(labels.items())
+    )
+    return "{" + rendered + "}"
+
+
+def _escape_label(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
+
+
+def _number(value: int | float) -> str:
+    if isinstance(value, int):
+        return str(value)
+    return f"{value:.6g}"
