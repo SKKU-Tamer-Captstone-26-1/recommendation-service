@@ -167,6 +167,7 @@ Domain docs live here:
 | Operations runbooks | `operations/runbooks.md` |
 | Production metrics | `operations/metrics.md` |
 | Load test plan | `operations/load-tests/README.md` |
+| Training dataset export | `operations/training-dataset.md` |
 | Korean technical record | `tech-kr/README.md` |
 | Derived-state decision | `decisions/adr-001-derived-state.md` |
 
@@ -253,6 +254,7 @@ docs/
   - release-gate.md
   - runbooks.md
   - metrics.md
+  - training-dataset.md
   - load-tests/
     - README.md
     - result-template.md
