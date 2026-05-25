@@ -55,4 +55,8 @@ if [[ "${RUN_SYNC_SMOKE:-0}" == "1" ]]; then
   python3 -m app.tools.venue_recommendation_smoke
 fi
 
+if [[ "${RUN_DEPLOYED_SMOKE:-0}" == "1" ]]; then
+  python3 -m app.tools.deployed_smoke --mode all
+fi
+
 echo "release gate passed reports=$REPORT_DIR"

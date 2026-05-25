@@ -85,6 +85,39 @@ This additionally:
 - runs the map snapshot import and selected-beverage venue recommendation smoke
   with place, menu, inventory, and price revisions preserved in logs
 
+## Optional Deployed Service Smoke
+
+When deployed staging service URLs and credentials are available:
+
+```bash
+RUN_DEPLOYED_SMOKE=1 bash scripts/codex-harness/verify-release-gate.sh
+```
+
+This additionally runs:
+
+```bash
+python3 -m app.tools.deployed_smoke --mode all
+```
+
+Each smoke reads only service APIs or gRPC metadata. Missing endpoint or
+credential environment variables cause that smoke to print `status=skipped`
+instead of failing local development. A skipped deployed smoke is not production
+evidence; it means the missing external input must stay tracked in
+`docs/human-effort.md`.
+
+Useful environment variables:
+
+```text
+AUTH_SMOKE_JWKS_URL
+SURVEY_SMOKE_BASE_URL
+MAP_SMOKE_BASE_URL
+RECOMMENDATION_SMOKE_GRPC_ADDR
+CHAT_SMOKE_HTTP_URL
+CHAT_SMOKE_GRPC_ADDR
+SMOKE_AUTH_BEARER_TOKEN
+SMOKE_GRPC_TLS
+```
+
 ## Operations Metrics Endpoint
 
 The HTTP API exposes:

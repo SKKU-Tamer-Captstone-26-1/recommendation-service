@@ -75,6 +75,32 @@ Acceptance evidence when unblocked:
 auth_context_smoke = pass
 ```
 
+### Deployed Chat-Service Recommendation Smoke
+
+Status: external dependency required.
+
+Current repo evidence:
+
+- The deployed smoke harness can call a configured chat HTTP smoke endpoint or
+  gRPC health endpoint.
+- The assistant/chat boundary requires chat-service to call
+  recommendation-service for deterministic recommendation facts.
+
+Human-provided inputs needed:
+
+- deployed chat-service/assistant-service HTTP recommendation smoke URL or gRPC
+  address
+- auth metadata or internal service credential required for the smoke
+- safe prompt/payload that asks for a recommendation and is allowed in staging
+- expected response marker proving the answer used recommendation-service facts
+  instead of ungrounded LLM ranking
+
+Acceptance evidence when unblocked:
+
+```text
+chat_recommendation_deployed_smoke = pass
+```
+
 ## Non-Blocking Operational Note
 
 Local Qdrant smoke currently passes, but the local tool output warns that the
