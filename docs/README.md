@@ -132,6 +132,7 @@ Domain docs live here:
 - migration strategy
 - release gates and operational runbooks
 - human-required external blockers
+- Korean technical records
 - architectural decisions
 
 ## Source-of-Truth Documents
@@ -164,6 +165,7 @@ Domain docs live here:
 | Migration rules | `database/migration-strategy.md` |
 | Release gate | `operations/release-gate.md` |
 | Operations runbooks | `operations/runbooks.md` |
+| Korean technical record | `tech-kr/README.md` |
 | Derived-state decision | `decisions/adr-001-derived-state.md` |
 
 ## Reading Order
@@ -248,6 +250,8 @@ docs/
 - operations/
   - release-gate.md
   - runbooks.md
+- tech-kr/
+  - README.md
 - decisions/
   - adr-001-derived-state.md
 ```
