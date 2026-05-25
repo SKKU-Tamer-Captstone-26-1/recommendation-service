@@ -1,0 +1,389 @@
+---
+title: "추천 엔진 제작기 01: 우리가 실제로 만든 것"
+description: "ONTHEBLOCK recommendation-service의 현재 기능, 경계, 운영 준비 상태를 한국어로 정리한 블로그 초안"
+date: "2026-05-25"
+tags:
+  - recommendation
+  - backend
+  - mlops
+  - ontheblock
+---
+
+# 추천 엔진 제작기 01: 우리가 실제로 만든 것
+
+이 글은 `recommendation-service`에서 지금까지 만든 내용을 제품/엔지니어링 관점으로 정리한 기록이다. 핵심은 하나다.
+
+> 지금 만든 것은 "LLM이 알아서 추천하는 챗봇"이 아니라, PostgreSQL을 기준으로 재현 가능한 추천 결과를 만들고, 그 결과를 나중에 ML 모델로 개선할 수 있게 만드는 추천 서비스다.
+
+## 현재 상태 요약
+
+현재 서비스는 다음 목표를 향해 만들어졌다.
+
+- 사용자의 설문 결과에서 파생된 취향 프로필을 사용한다.
+- 술/음료 카탈로그와 flavor vector를 기반으로 음료를 추천한다.
+- 지도/장소 서비스가 제공한 스냅샷을 기반으로 거리, 가격, 재고/가용성, freshness를 반영해 장소를 추천한다.
+- 추천 요청, 결과, 설명, 사용자 interaction을 PostgreSQL에 남긴다.
+- Qdrant는 빠른 vector 검색을 위한 파생 인덱스로만 사용한다.
+- 추천 결과는 reason code와 score breakdown으로 설명 가능해야 한다.
+- 챗봇은 추천 순위를 직접 만들지 않고 recommendation-service의 deterministic result를 호출해야 한다.
+
+현재 기준으로 중요한 문서는 다음이다.
+
+- [`docs/plans/009.md`](./docs/plans/009.md): 70% production readiness 계획
+- [`docs/plans/010.md`](./docs/plans/010.md): staging smoke, load test, metrics, training export, MLflow POC 계획
+- [`docs/plans/011.md`](./docs/plans/011.md): feedback label, shadow model, ML promotion 준비 계획
+- [`docs/recommendation/recommendation-logic.md`](./docs/recommendation/recommendation-logic.md): 추천 로직의 기준 문서
+- [`docs/operations/training-dataset.md`](./docs/operations/training-dataset.md): 학습 데이터 export 기준
+- [`docs/operations/mlflow-poc.md`](./docs/operations/mlflow-poc.md): MLflow POC 기준
+
+## 서비스 경계
+
+추천 엔진을 만들 때 가장 위험한 선택은 빠르게 만들기 위해 다른 서비스의 DB를 직접 읽는 것이다. 우리는 이걸 금지했다.
+
+| 데이터 | 소유 서비스 | recommendation-service에서 하는 일 |
+|---|---|---|
+| 로그인, JWT, user identity | auth-service | gateway/auth metadata만 신뢰 |
+| raw survey answer | survey-service | 직접 저장/수정하지 않음 |
+| derived taste profile | recommendation-service | 설문 출력에서 파생해 저장 |
+| canonical place/menu/inventory/price | map-service/place-service | 직접 DB read/write 금지 |
+| map/place read-model snapshot | recommendation-service | 추천 ranking용 파생 snapshot으로 저장 |
+| beverage catalog MVP | recommendation-service | catalog-service 분리 전까지 소유 |
+| recommendation logs/interactions | recommendation-service | 요청, 결과, 설명, feedback 저장 |
+| Qdrant vector points | rebuildable derived index | PostgreSQL에서 재생성 가능해야 함 |
+
+이 경계가 중요한 이유는 production에서 책임 소재를 분명히 하기 위해서다. 예를 들어 장소 가격이 틀렸다면 추천 서비스가 canonical price owner가 아니다. 추천 서비스는 "어떤 snapshot revision을 사용했는지"만 남겨야 한다.
+
+## 구현된 핵심 API
+
+현재 gRPC proto의 핵심 RPC는 네 개다.
+
+```proto
+service RecommendationService {
+  rpc GetProfileStatus(GetProfileStatusRequest) returns (GetProfileStatusResponse);
+  rpc GetBeverageRecommendations(GetBeverageRecommendationsRequest)
+      returns (GetBeverageRecommendationsResponse);
+  rpc GetVenueRecommendations(GetVenueRecommendationsRequest)
+      returns (GetVenueRecommendationsResponse);
+  rpc RecordRecommendationEvent(RecordRecommendationEventRequest)
+      returns (RecordRecommendationEventResponse);
+}
+```
+
+### 1. GetProfileStatus
+
+사용자의 현재 추천 프로필 상태를 확인한다.
+
+가능한 상태:
+
+- `PROFILE_STATUS_MISSING`
+- `PROFILE_STATUS_PENDING_GENERATION`
+- `PROFILE_STATUS_ACTIVE`
+- `PROFILE_STATUS_STALE`
+- `PROFILE_STATUS_FAILED_GENERATION`
+
+이 API는 Flutter나 chatbot이 "지금 추천을 보여줘도 되는지" 판단하는 첫 번째 gate다.
+
+### 2. GetBeverageRecommendations
+
+사용자 taste profile과 beverage catalog를 비교해서 음료를 추천한다.
+
+응답에는 다음이 포함된다.
+
+- `request_id`
+- profile status/revision
+- rank
+- beverage id
+- Korean/English name
+- category
+- score
+- reason codes
+- deterministic explanation
+- metadata
+
+여기서 중요한 점은 "추천 이유"가 LLM 텍스트가 아니라 reason code와 score breakdown에서 나온다는 것이다.
+
+### 3. GetVenueRecommendations
+
+선택한 음료를 기준으로 주변 장소를 추천한다. 이때 map-service/place-service가 canonical owner인 장소 정보를 직접 읽지 않는다. 대신 map snapshot read-model을 사용한다.
+
+응답에는 다음이 포함된다.
+
+- place id
+- place name/type/address
+- option type
+  - nearest reasonable
+  - best price
+  - balanced best
+- distance
+- price
+- availability status
+- freshness status
+- final score
+- reason codes
+- snapshot revision metadata
+
+즉 "가까운지", "가격이 괜찮은지", "재고/메뉴 freshness가 괜찮은지"를 structured data로 계산한다.
+
+### 4. RecordRecommendationEvent
+
+추천 결과에 대한 사용자 행동을 저장한다.
+
+현재 이벤트 타입:
+
+- impression
+- click
+- save
+- dismiss
+- detail_view
+
+이 interaction이 나중에 진짜 ML 모델을 학습할 label 후보가 된다. 단, 현재는 label volume과 품질이 충분하지 않기 때문에 production ranker를 ML 모델로 바꾸지 않는다.
+
+## Plan 010에서 추가한 운영 기능
+
+최근 구현한 Plan 010의 핵심은 "추천 로직 자체"보다 production으로 가기 위한 검증 도구였다.
+
+### 배포 smoke harness
+
+추가된 기능:
+
+- auth JWKS/metadata smoke
+- survey-service smoke
+- map-service snapshot smoke
+- recommendation-service gRPC smoke
+- chat-service recommendation orchestration smoke
+
+환경 변수가 없으면 실패하지 않고 명확하게 skipped 상태를 낸다. 이것은 staging endpoint와 credential이 아직 없을 때 CI를 불필요하게 깨지 않기 위한 선택이다.
+
+### load-test harness
+
+`scripts/load/ghz-recommendation.sh`로 gRPC 부하 테스트 프로파일을 만들었다.
+
+| Profile | RPS | 목적 |
+|---|---:|---|
+| smoke | 1-5 | 연결과 auth sanity |
+| beta | 20 | 1,000-5,000명 베타 피크 가정 |
+| peak | 50 | 프로모션성 피크 |
+| stress | 100 | 병목 찾기 |
+| soak | expected peak | 1-2시간 안정성 확인 |
+
+초기 목표:
+
+- beverage recommendation p95 <= 500ms
+- venue recommendation p95 <= 800ms
+- error rate <= 1%
+- DB connection saturation 없음
+- Qdrant failure count 0
+- empty recommendation spike 없음
+
+### Prometheus metrics exporter
+
+추가된 endpoint:
+
+```text
+GET /v1/operations/metrics
+GET /v1/operations/metrics/prometheus
+```
+
+대표 metric:
+
+- recommendation request count
+- empty rate
+- profile missing/stale rate
+- survey sync lag
+- map snapshot sync lag
+- Qdrant pending/failed points
+- DB pool checked out/size
+- gRPC status counter
+- runtime latency histogram
+
+이제 "추천이 느리다"를 감으로 말하지 않고, p95 latency, error rate, empty rate로 볼 수 있다.
+
+### Training dataset export
+
+추가된 command:
+
+```bash
+python3 -m app.tools.export_training_dataset \
+  --from 2026-05-25T00:00:00Z \
+  --to 2026-05-26T00:00:00Z \
+  --output /private/tmp/recommendation-training-dataset
+```
+
+출력:
+
+- `dataset.jsonl`
+- `manifest.json`
+- `feature_schema.json`
+- `label_definitions.json`
+- `data_quality_report.json`
+
+허용된 source:
+
+- recommendation requests
+- recommendation results
+- recommendation explanations
+- recommendation interactions
+- derived profile metadata
+- recommendation log에 저장된 snapshot metadata
+
+금지된 source:
+
+- raw survey answer
+- survey-service storage
+- map-service canonical storage
+- auth-service identity storage
+
+### MLflow POC artifacts
+
+추가된 command:
+
+```bash
+python3 -m app.tools.mlflow_poc \
+  --dataset-export-dir /private/tmp/recommendation-training-dataset \
+  --output /private/tmp/recommendation-mlflow-poc
+```
+
+출력:
+
+- `baseline_run.json`
+- `candidate_model_run.json`
+- `evaluation_report.json`
+- `model_registry_candidate.json`
+- `model_card.md`
+
+여기서 중요한 제한은 모델 stage가 candidate라는 점이다. production serving은 아직 deterministic scoring이다.
+
+## 현재 추천 엔진의 수학적 구조
+
+현재 구조를 단순화하면 사용자 profile vector와 candidate vector의 matching 문제다.
+
+사용자 취향 vector를 다음처럼 둔다.
+
+```latex
+u \in \mathbb{R}^{d}
+```
+
+음료 또는 장소 후보의 vector를 다음처럼 둔다.
+
+```latex
+v_i \in \mathbb{R}^{d}
+```
+
+기본 taste similarity는 weighted cosine 형태로 생각할 수 있다.
+
+```latex
+T(u, v_i) =
+\frac{\sum_{k=1}^{d} w_k u_k v_{i,k}}
+{\sqrt{\sum_{k=1}^{d} w_k u_k^2}
+\sqrt{\sum_{k=1}^{d} w_k v_{i,k}^2}}
+```
+
+장소 추천은 여기에 거리, 가격, 가용성, freshness가 추가된다.
+
+```latex
+S_i =
+\alpha T(u, v_i)
++ \beta B_i
++ \gamma D_i
++ \delta A_i
++ \eta F_i
++ \rho C_i
+```
+
+각 항의 의미:
+
+- `T`: taste similarity
+- `B`: budget fit
+- `D`: distance fit
+- `A`: availability confidence
+- `F`: snapshot freshness
+- `C`: category/style fit
+
+거리 점수는 보통 가까울수록 높아지는 감쇠 함수로 볼 수 있다.
+
+```latex
+D_i = \exp\left(-\frac{distance_i}{\tau_d}\right)
+```
+
+가격 점수는 사용자의 예산 중심 `b`와 후보 가격 `p_i` 사이의 차이를 반영할 수 있다.
+
+```latex
+B_i = \exp\left(-\frac{(p_i - b)^2}{2\sigma_b^2}\right)
+```
+
+현재 production에서는 이 구조를 deterministic scoring으로 사용하고, 나중에 충분한 interaction label이 모이면 candidate model이 이 점수를 대체하거나 보조할 수 있다.
+
+## 한계
+
+솔직히 지금 한계는 분명하다.
+
+### 1. 아직 "진짜 AI 모델 production serving"은 아니다
+
+MLflow POC는 만들었지만, 모델이 실제 ranking을 바꾸지 않는다. 이유는 단순하다. 아직 충분한 real user label이 없다.
+
+필요한 것:
+
+- 충분한 impression
+- 충분한 click/save/detail_view
+- 충분한 dismiss 또는 negative signal
+- duplicate event 통제
+- idempotency key 품질
+- time-based validation
+- shadow evaluation
+- canary rollback plan
+
+### 2. 외부 서비스 staging smoke가 아직 완전히 통과한 것은 아니다
+
+현재 repo 안에서 smoke harness는 있다. 하지만 auth/survey/map/chat/recommendation deployed endpoint와 credential이 없으면 실제 deployed smoke는 skipped다.
+
+이 blocker는 [`docs/human-effort.md`](./docs/human-effort.md)에 기록했다.
+
+### 3. map data는 canonical이 아니다
+
+추천 서비스는 지도 DB의 주인이 아니다. 따라서 장소/가격/재고가 틀렸을 때 추천 서비스가 직접 고치면 안 된다. map-service/place-service API나 snapshot sync를 통해 해결해야 한다.
+
+### 4. Qdrant는 canonical store가 아니다
+
+Qdrant가 없어도 PostgreSQL vector에서 다시 rebuild 가능해야 한다. Qdrant를 source of truth처럼 쓰면 운영 복구가 어려워진다.
+
+### 5. LLM은 ranker가 아니다
+
+챗봇은 설명을 자연스럽게 바꿀 수는 있지만, 추천 순위와 score를 직접 만들면 안 된다. 추천 순위는 structured profile, structured catalog, structured snapshot, versioned scoring config에서 나와야 한다.
+
+## 500-5,000명 트래픽에서의 대응 방식
+
+500-5,000명 베타 트래픽은 초대형 시스템은 아니지만, 추천 서비스에서는 다음 문제가 바로 드러난다.
+
+- DB connection pool saturation
+- Qdrant latency/failure
+- profile missing rate 증가
+- map snapshot freshness 저하
+- recommendation empty rate spike
+- gRPC p95 latency 증가
+
+대응 우선순위:
+
+1. p95 latency와 error rate를 Prometheus로 관측한다.
+2. read-heavy endpoint는 DB query와 vector lookup 병목을 먼저 본다.
+3. Qdrant 실패 시 PostgreSQL fallback이 가능한지 확인한다.
+4. profile generation과 survey sync lag를 분리해서 본다.
+5. stress test보다 먼저 20 RPS beta와 50 RPS peak를 통과시킨다.
+6. interaction write load는 safe test user와 idempotency key로만 테스트한다.
+
+아직 Redis, Kafka, Airflow를 넣지 않은 이유도 여기에 있다. 현재 단계에서 중요한 것은 인프라를 많이 붙이는 것이 아니라, 병목을 실제 숫자로 확인하는 것이다.
+
+## 다음 단계
+
+다음 구현 계획인 [`docs/plans/011.md`](./docs/plans/011.md)는 "진짜 AI 모델"로 가기 위한 중간 단계다.
+
+핵심은 다음이다.
+
+- feedback event contract 정리
+- label quality audit
+- leak-safe feature extraction
+- offline candidate ranker
+- shadow score comparison
+- model promotion gate 문서화
+
+즉 바로 모델을 production에 넣는 것이 아니라, 모델을 넣어도 되는지 증명하는 시스템을 먼저 만든다.
+
