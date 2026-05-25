@@ -165,6 +165,7 @@ Domain docs live here:
 | Migration rules | `database/migration-strategy.md` |
 | Release gate | `operations/release-gate.md` |
 | Operations runbooks | `operations/runbooks.md` |
+| Load test plan | `operations/load-tests/README.md` |
 | Korean technical record | `tech-kr/README.md` |
 | Derived-state decision | `decisions/adr-001-derived-state.md` |
 
@@ -250,6 +251,9 @@ docs/
 - operations/
   - release-gate.md
   - runbooks.md
+  - load-tests/
+    - README.md
+    - result-template.md
 - tech-kr/
   - README.md
 - decisions/
