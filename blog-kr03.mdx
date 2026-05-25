@@ -1,0 +1,551 @@
+---
+title: "추천 엔진 제작기 03: 추천 시스템 논문 리뷰와 우리 서비스에 적용할 점"
+description: "BPR, Wide & Deep, YouTube DNN, NCF, DeepFM, DLRM, Airbnb embeddings, ML technical debt를 ONTHEBLOCK 추천 엔진 관점에서 리뷰한 한국어 블로그 초안"
+date: "2026-05-25"
+tags:
+  - recommendation
+  - paper-review
+  - mlops
+  - recsys
+---
+
+# 추천 엔진 제작기 03: 추천 시스템 논문 리뷰와 우리 서비스에 적용할 점
+
+이 글은 추천 시스템 논문들을 우리 `recommendation-service` 관점에서 리뷰한 글이다. 목표는 논문 요약이 아니라, "우리 서비스에 지금 당장 적용할 것과 아직 적용하면 안 되는 것"을 구분하는 것이다.
+
+## 먼저 결론
+
+우리가 지금 해야 할 일은 최신 deep model을 바로 production에 넣는 것이 아니다.
+
+우선순위는 다음이다.
+
+1. deterministic scoring을 안정화한다.
+2. 추천 request/result/explanation/interaction log를 정확히 남긴다.
+3. impression, click, save, dismiss, detail_view label을 품질 관리한다.
+4. leak-safe feature export를 만든다.
+5. offline candidate model을 baseline과 비교한다.
+6. shadow scoring으로 user-visible ranking을 바꾸지 않고 검증한다.
+7. 그 다음 canary plan을 만든다.
+
+이 결론은 유명 추천 논문들과 production ML paper들이 공통으로 주는 메시지와 맞다. 모델 구조보다 데이터, 로그, 평가, 운영 경계가 먼저다.
+
+## 1. Matrix Factorization과 BPR
+
+관련 논문:
+
+- Steffen Rendle et al., "BPR: Bayesian Personalized Ranking from Implicit Feedback"  
+  https://arxiv.org/abs/1205.2618
+
+### 핵심 아이디어
+
+Matrix Factorization은 user와 item을 latent vector로 표현한다.
+
+```latex
+\hat{r}_{u,i}
+=
+p_u^\top q_i
++ b_u
++ b_i
++ \mu
+```
+
+여기서:
+
+- `p_u`: user latent vector
+- `q_i`: item latent vector
+- `b_u`, `b_i`: user/item bias
+- `mu`: global bias
+
+BPR은 explicit rating이 아니라 implicit feedback에서 pairwise preference를 학습한다. 즉 user가 item `i`를 선호하고 item `j`는 선호하지 않는다고 보고 다음 차이를 키운다.
+
+```latex
+\hat{x}_{u,i,j}
+=
+\hat{x}_{u,i} - \hat{x}_{u,j}
+```
+
+BPR loss:
+
+```latex
+\mathcal{L}_{BPR}
+=
+- \sum_{(u,i,j)}
+\log \sigma
+\left(
+\hat{x}_{u,i} - \hat{x}_{u,j}
+\right)
++ \lambda \lVert \Theta \rVert^2
+```
+
+### 우리 서비스에 적용할 점
+
+`RecordRecommendationEvent`로 쌓는 click/save/detail_view/dismiss는 나중에 BPR류 pairwise 학습으로 연결될 수 있다.
+
+예:
+
+- save한 음료 `i`
+- 같은 impression set에서 무시되거나 dismiss된 음료 `j`
+
+그러면 `(u, i, j)` pair를 만들 수 있다.
+
+### 지금 적용하면 안 되는 점
+
+BPR은 implicit feedback이 충분해야 한다. 현재는 label volume이 충분하지 않다. 그래서 Plan 011에서 label quality audit을 먼저 만든다.
+
+필요한 최소 조건:
+
+- impression coverage
+- positive event 수
+- negative event 수
+- duplicate event rate
+- missing idempotency rate
+
+## 2. Factorization Machines
+
+관련 논문:
+
+- Steffen Rendle, "Factorization Machines", ICDM 2010  
+  DOI: 10.1109/ICDM.2010.127
+
+### 핵심 아이디어
+
+Factorization Machine은 sparse feature 사이의 2차 interaction을 효율적으로 모델링한다.
+
+```latex
+\hat{y}(x)
+=
+w_0
++ \sum_{i=1}^{n} w_i x_i
++ \sum_{i=1}^{n}
+\sum_{j=i+1}^{n}
+\langle v_i, v_j \rangle x_i x_j
+```
+
+추천에서는 user feature, item feature, context feature가 sparse하게 들어오기 때문에 FM은 강력한 baseline이 될 수 있다.
+
+### 우리 서비스에 적용할 점
+
+우리 feature는 이미 structured data 중심이다.
+
+- user taste dimension
+- category/style
+- budget mode
+- distance bucket
+- price bucket
+- availability status
+- freshness status
+- scoring config version
+
+이런 feature들은 FM 또는 linear/logistic baseline에 잘 맞는다.
+
+### 지금 적용하면 안 되는 점
+
+FM을 production serving에 바로 넣는 것은 아직 이르다. 먼저 deterministic baseline보다 offline metric이 좋아야 하고, shadow score에서 slice regression이 없어야 한다.
+
+## 3. Wide & Deep Learning
+
+관련 논문:
+
+- Heng-Tze Cheng et al., "Wide & Deep Learning for Recommender Systems"  
+  Google Research: https://research.google/pubs/pub45413  
+  arXiv: https://arxiv.org/abs/1606.07792
+
+### 핵심 아이디어
+
+Wide & Deep은 memorization과 generalization을 함께 사용한다.
+
+- wide component: feature cross를 외우는 능력
+- deep component: embedding과 neural network를 통한 일반화
+
+단순화하면 다음 형태다.
+
+```latex
+P(Y=1 \mid x)
+=
+\sigma
+\left(
+w_{wide}^{\top} x_{wide}
++ w_{deep}^{\top} a^{(l)}
++ b
+\right)
+```
+
+### 우리 서비스에 적용할 점
+
+추천 서비스도 비슷한 문제가 있다.
+
+- 사용자가 특정 category/style을 반복적으로 좋아하는 memorization
+- 아직 본 적 없는 조합을 추천하는 generalization
+
+예:
+
+- "초보자 + sweet + low bitterness + whiskey" 조합은 wide feature로 잘 잡힌다.
+- "sweet profile이지만 makgeolli나 cocktail로 확장"하는 것은 deep/generalization 계열이 유리할 수 있다.
+
+### 지금 적용하면 안 되는 점
+
+Wide & Deep은 production data와 feature pipeline이 안정적일 때 의미가 있다. 현재는 feature extractor와 label quality audit이 먼저다.
+
+## 4. YouTube Deep Neural Network 추천
+
+관련 논문:
+
+- Paul Covington, Jay Adams, Emre Sargin, "Deep Neural Networks for YouTube Recommendations"  
+  Google Research PDF: https://research.google.com/pubs/archive/45530.pdf
+
+### 핵심 아이디어
+
+YouTube 논문은 추천을 크게 두 단계로 본다.
+
+1. candidate generation
+2. ranking
+
+대규모 corpus에서는 모든 item을 full ranking할 수 없기 때문에 먼저 후보를 줄이고, 그 다음 더 비싼 ranking model을 적용한다.
+
+### 우리 서비스에 적용할 점
+
+우리도 같은 구조가 필요하다.
+
+```text
+candidate generation -> hard filter -> reranking -> explanation -> logging
+```
+
+현재 beverage catalog는 60개 수준이라 full scan도 가능하다. 하지만 장소/메뉴가 늘어나면 candidate generation과 reranking을 분리해야 한다.
+
+Qdrant는 이때 candidate generation을 도와줄 수 있다. 하지만 Qdrant가 canonical source가 되면 안 된다.
+
+### 지금 적용하면 안 되는 점
+
+YouTube 규모의 architecture를 지금 그대로 가져오면 과하다. 아직 필요한 것은 거대한 neural retrieval보다:
+
+- catalog 품질
+- map snapshot freshness
+- scoring config versioning
+- release gate
+- load test
+
+이다.
+
+## 5. Neural Collaborative Filtering
+
+관련 논문:
+
+- Xiangnan He et al., "Neural Collaborative Filtering"  
+  arXiv: https://arxiv.org/abs/1708.05031
+
+### 핵심 아이디어
+
+NCF는 matrix factorization의 inner product 대신 neural network가 user-item interaction function을 학습하게 한다.
+
+기존 MF:
+
+```latex
+\hat{y}_{u,i}
+=
+p_u^\top q_i
+```
+
+NCF 관점:
+
+```latex
+\hat{y}_{u,i}
+=
+f_{\theta}(p_u, q_i)
+```
+
+즉 inner product 하나로 interaction을 제한하지 않고, MLP가 복잡한 관계를 학습하게 한다.
+
+### 우리 서비스에 적용할 점
+
+나중에 user interaction이 충분히 쌓이면 NCF류 모델을 candidate ranker로 테스트할 수 있다.
+
+특히 다음 feature가 유용하다.
+
+- user derived taste vector
+- item flavor vector
+- interaction history
+- category/style embedding
+
+### 지금 적용하면 안 되는 점
+
+현재는 user-item interaction matrix가 희소하고 작다. 이 상태에서 NCF를 쓰면 overfitting 가능성이 크다. deterministic scoring과 simple baseline을 먼저 이겨야 한다.
+
+## 6. DeepFM
+
+관련 논문:
+
+- Huifeng Guo et al., "DeepFM: A Factorization-Machine based Neural Network for CTR Prediction"  
+  arXiv: https://arxiv.org/abs/1703.04247  
+  IJCAI PDF: https://www.ijcai.org/Proceedings/2017/0239.pdf
+
+### 핵심 아이디어
+
+DeepFM은 FM component와 deep component를 결합한다.
+
+```latex
+\hat{y}
+=
+\sigma
+\left(
+y_{FM}
++ y_{DNN}
+\right)
+```
+
+FM은 low-order feature interaction을 잡고, DNN은 high-order interaction을 잡는다.
+
+### 우리 서비스에 적용할 점
+
+우리 문제는 CTR prediction과 비슷한 부분이 있다.
+
+- 어떤 추천 결과가 클릭되는가?
+- 어떤 장소 option이 detail view를 만드는가?
+- 어떤 가격/거리 조합이 dismiss되는가?
+
+그래서 label이 쌓이면 DeepFM류 모델은 후보가 될 수 있다.
+
+### 지금 적용하면 안 되는 점
+
+DeepFM은 feature pipeline과 label quality가 나쁘면 복잡한 garbage-in garbage-out 모델이 된다. Plan 011의 feature leakage guard가 먼저다.
+
+## 7. DLRM
+
+관련 논문:
+
+- Maxim Naumov et al., "Deep Learning Recommendation Model for Personalization and Recommendation Systems"  
+  arXiv: https://arxiv.org/abs/1906.00091
+
+### 핵심 아이디어
+
+DLRM은 dense feature와 sparse categorical feature embedding을 함께 사용하고, feature interaction을 모델링한다.
+
+추천/광고 시스템에서는 categorical feature가 많다.
+
+- user id
+- item id
+- category id
+- context id
+- device/platform
+
+DLRM은 이런 embedding table과 dense MLP를 함께 다룬다.
+
+### 우리 서비스에 적용할 점
+
+나중에 데이터가 커지면 다음 feature가 DLRM 계열에 맞을 수 있다.
+
+- beverage category/style embedding
+- venue type embedding
+- user segment embedding
+- price bucket embedding
+- distance bucket embedding
+- dense taste vector
+
+### 지금 적용하면 안 되는 점
+
+DLRM은 infra 부담이 크다. embedding table, training data volume, serving latency, monitoring, rollback이 필요하다. 현재 단계에서는 과하다.
+
+## 8. Airbnb Embeddings
+
+관련 논문:
+
+- Mihajlo Grbovic, Haibin Cheng, "Real-time Personalization using Embeddings for Search Ranking at Airbnb"  
+  KDD 2018: https://www.kdd.org/kdd2018/accepted-papers/view/real-time-personalization-using-embeddings-for-search-ranking-at-airbnb
+
+### 핵심 아이디어
+
+Airbnb는 listing/user embedding을 검색 ranking과 비슷한 listing 추천에 사용했다. 중요한 점은 단순 item similarity가 아니라 marketplace 제약을 고려한다는 것이다.
+
+Airbnb와 우리 서비스의 공통점:
+
+- location이 중요하다.
+- item availability가 중요하다.
+- user preference가 단기/장기로 나뉠 수 있다.
+- 같은 item을 반복 소비하지 않는 경우가 있다.
+
+### 우리 서비스에 적용할 점
+
+장소 추천은 단순히 "맛이 맞는 술이 있는 곳"이 아니다.
+
+- 지금 가까운가?
+- 지금 가격이 좋은가?
+- 지금 재고/메뉴 snapshot이 fresh한가?
+- 사용자가 오늘 원하는 분위기나 장소 타입과 맞는가?
+
+따라서 venue embedding은 나중에 유용할 수 있다. 하지만 canonical place data는 map-service/place-service가 소유해야 한다.
+
+## 9. Two-Tower Retrieval과 Sampling Bias
+
+관련 논문:
+
+- Xinyang Yi et al., "Sampling-Bias-Corrected Neural Modeling for Large Corpus Item Recommendations"  
+  Google Research: https://research.google/pubs/sampling-bias-corrected-neural-modeling-for-large-corpus-item-recommendations/
+
+### 핵심 아이디어
+
+Two-tower model은 user/query tower와 item tower를 따로 학습하고, dot product로 retrieval한다.
+
+```latex
+s(u, i)
+=
+f_{\theta}(u)^\top g_{\phi}(i)
+```
+
+대규모 item corpus에서는 in-batch negative를 자주 쓰지만, item popularity distribution 때문에 sampling bias가 생길 수 있다.
+
+### 우리 서비스에 적용할 점
+
+나중에 beverage와 venue가 많아지면 two-tower retrieval은 유용할 수 있다.
+
+하지만 지금은 catalog size보다 data correctness가 더 큰 문제다. Qdrant를 붙였다고 바로 two-tower production이 되는 것은 아니다.
+
+적용 순서:
+
+1. PostgreSQL canonical vector 안정화
+2. Qdrant rebuild 검증
+3. interaction label 수집
+4. offline retrieval metric
+5. shadow retrieval
+6. canary
+
+## 10. Hidden Technical Debt in ML Systems
+
+관련 논문:
+
+- D. Sculley et al., "Hidden Technical Debt in Machine Learning Systems"  
+  NeurIPS 2015: https://papers.nips.cc/paper/5656-hidden-technical-debt-in-machine-learning-systems
+
+### 핵심 아이디어
+
+ML 시스템은 모델 코드보다 주변 시스템이 훨씬 복잡하다. 특히 다음 문제가 technical debt를 만든다.
+
+- boundary erosion
+- hidden feedback loop
+- undeclared consumer
+- data dependency
+- configuration debt
+- changing external world
+
+### 우리 서비스에 적용할 점
+
+이 논문은 우리 architecture decision과 거의 직접 연결된다.
+
+우리가 금지한 것:
+
+- recommendation-service가 map-service DB 직접 읽기
+- recommendation-service가 survey-service raw answer 저장하기
+- Qdrant를 canonical store처럼 쓰기
+- LLM/RAG를 ranker로 쓰기
+- unversioned scoring config 변경
+
+모두 ML technical debt를 줄이기 위한 결정이다.
+
+## 11. MLflow와 Model Registry
+
+관련 문서:
+
+- MLflow Tracking docs: https://www.mlflow.org/docs/latest/ml/tracking
+- MLflow Model Registry docs: https://www.mlflow.org/docs/2.5.0/model-registry.html
+
+### 핵심 아이디어
+
+MLflow는 experiment tracking, artifact logging, model registry를 통해 ML lifecycle을 추적하게 해준다.
+
+우리에게 필요한 artifact:
+
+- dataset manifest
+- feature schema
+- training config
+- baseline metrics
+- candidate metrics
+- evaluation report
+- model card
+- candidate model artifact
+
+### 우리 서비스에 적용할 점
+
+Plan 010에서 MLflow POC artifact를 만들었다. Plan 011에서는 이것을 진짜 label/feature/model evaluation 흐름으로 확장해야 한다.
+
+중요한 제한:
+
+- MLflow backend store는 recommendation-service application schema와 분리한다.
+- candidate model은 candidate stage로만 둔다.
+- model registry에 올라갔다고 production ranker가 되는 것은 아니다.
+
+## 논문 리뷰를 우리 로드맵으로 바꾸면
+
+| 논문/기술 | 지금 적용 | 나중 적용 | 아직 금지 |
+|---|---|---|---|
+| BPR | interaction label 설계 | pairwise ranker | label 부족한 상태의 production 적용 |
+| FM | simple offline baseline | CTR/ranking candidate | serving 즉시 교체 |
+| Wide & Deep | feature cross 아이디어 | large label model | feature pipeline 전 도입 |
+| YouTube DNN | candidate/ranking 분리 | neural retrieval | 과한 대규모 infra |
+| NCF | user-item interaction 관점 | collaborative ranker | sparse data overfit |
+| DeepFM | feature interaction 관점 | CTR candidate | leakage guard 전 학습 |
+| DLRM | dense/sparse feature 구분 | large-scale candidate | 현재 단계 infra 과투자 |
+| Airbnb embedding | location/marketplace 제약 | venue embedding | map ownership 침범 |
+| ML technical debt | boundary rule | promotion governance | hidden DB coupling |
+| MLflow | artifact discipline | experiment registry | production 자동 승격 |
+
+## 그래서 Plan 011이 필요한 이유
+
+Plan 011은 "좋아 보이는 모델"을 넣는 계획이 아니다. 모델을 넣어도 되는지 판단할 수 있게 만드는 계획이다.
+
+필요한 구현:
+
+- feedback event contract hardening
+- label quality audit
+- leak-safe feature extraction
+- offline candidate ranker
+- shadow score storage/comparison
+- model promotion gate documentation
+
+이 순서를 지키면 추천 시스템은 다음처럼 성장한다.
+
+```latex
+heuristic
+\rightarrow deterministic\ scoring
+\rightarrow offline\ learned\ candidate
+\rightarrow shadow\ comparison
+\rightarrow canary
+\rightarrow production\ model
+```
+
+## 마지막 정리
+
+추천 시스템 논문을 읽으면 모델 구조가 먼저 눈에 들어온다. 하지만 production 서비스에서는 다음 질문이 더 중요하다.
+
+- 이 feature는 추천 시점에 이미 알고 있었는가?
+- 이 label은 실제 선호를 나타내는가?
+- 이 모델이 baseline보다 어느 slice에서 좋아졌는가?
+- 나빠진 user group은 없는가?
+- 문제가 생기면 deterministic ranker로 바로 rollback 가능한가?
+- 결과를 나중에 재현할 수 있는가?
+
+우리 서비스가 지금 deterministic scoring을 유지하는 이유는 보수적이어서가 아니다. 추천 시스템을 production으로 가져가기 위해 필요한 순서가 그렇기 때문이다.
+
+## 참고 자료
+
+- BPR: Bayesian Personalized Ranking from Implicit Feedback  
+  https://arxiv.org/abs/1205.2618
+- Wide & Deep Learning for Recommender Systems  
+  https://research.google/pubs/pub45413  
+  https://arxiv.org/abs/1606.07792
+- Deep Neural Networks for YouTube Recommendations  
+  https://research.google.com/pubs/archive/45530.pdf
+- Neural Collaborative Filtering  
+  https://arxiv.org/abs/1708.05031
+- DeepFM: A Factorization-Machine based Neural Network for CTR Prediction  
+  https://arxiv.org/abs/1703.04247  
+  https://www.ijcai.org/Proceedings/2017/0239.pdf
+- Deep Learning Recommendation Model for Personalization and Recommendation Systems  
+  https://arxiv.org/abs/1906.00091
+- Real-time Personalization using Embeddings for Search Ranking at Airbnb  
+  https://www.kdd.org/kdd2018/accepted-papers/view/real-time-personalization-using-embeddings-for-search-ranking-at-airbnb
+- Sampling-Bias-Corrected Neural Modeling for Large Corpus Item Recommendations  
+  https://research.google/pubs/sampling-bias-corrected-neural-modeling-for-large-corpus-item-recommendations/
+- Hidden Technical Debt in Machine Learning Systems  
+  https://papers.nips.cc/paper/5656-hidden-technical-debt-in-machine-learning-systems
+- MLflow Tracking  
+  https://www.mlflow.org/docs/latest/ml/tracking
+- MLflow Model Registry  
+  https://www.mlflow.org/docs/2.5.0/model-registry.html
