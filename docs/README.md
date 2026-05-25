@@ -133,6 +133,7 @@ Domain docs live here:
 - release gates and operational runbooks
 - human-required external blockers
 - Korean technical records
+- numbered implementation plans
 - architectural decisions
 
 ## Source-of-Truth Documents
@@ -262,6 +263,8 @@ docs/
     - result-template.md
 - tech-kr/
   - README.md
+- plans/
+  - 001.md ... 011.md
 - decisions/
   - adr-001-derived-state.md
 ```
