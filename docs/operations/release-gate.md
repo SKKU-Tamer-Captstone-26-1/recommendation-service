@@ -125,6 +125,27 @@ that the recommendation survey sync contract is deployed. Full survey sync
 evidence still requires the event/response contract in
 `docs/recommendation/sync-flow.md`.
 
+## Optional Cloud Run Deploy Gate
+
+Before deploying the gRPC service, review:
+
+```text
+docs/operations/gcp-deployment.md
+scripts/deploy/gcp-cloud-run-grpc.sh
+```
+
+The deploy script is intentionally guarded. It refuses database secrets that
+appear to belong to auth, survey, chat, map, gateway, or a shared password-only
+secret. A deploy is not production evidence until the dedicated
+recommendation-owned PostgreSQL database, Qdrant endpoint, migrations, seed
+promotion, Qdrant rebuild, and deployed recommendation smoke all pass.
+
+Minimum syntax check:
+
+```bash
+bash -n scripts/deploy/gcp-cloud-run-grpc.sh
+```
+
 ## Operations Metrics Endpoint
 
 The HTTP API exposes:

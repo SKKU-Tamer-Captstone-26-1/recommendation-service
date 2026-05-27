@@ -131,6 +131,7 @@ Domain docs live here:
 - database model
 - migration strategy
 - release gates and operational runbooks
+- GCP deployment runbooks
 - human-required external blockers
 - Korean technical records
 - numbered implementation plans
@@ -166,6 +167,7 @@ Domain docs live here:
 | Migration rules | `database/migration-strategy.md` |
 | Release gate | `operations/release-gate.md` |
 | Operations runbooks | `operations/runbooks.md` |
+| GCP deployment | `operations/gcp-deployment.md` |
 | Production metrics | `operations/metrics.md` |
 | Load test plan | `operations/load-tests/README.md` |
 | Training dataset export | `operations/training-dataset.md` |

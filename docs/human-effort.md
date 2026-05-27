@@ -143,6 +143,42 @@ Acceptance evidence when unblocked:
 recommendation_deployed_smoke = pass
 ```
 
+### Recommendation GCP Deployment Resources
+
+Status: external dependency required.
+
+Current repo evidence:
+
+- Cloud Run gRPC deployment script exists at
+  `scripts/deploy/gcp-cloud-run-grpc.sh`.
+- GCP deployment runbook exists at `docs/operations/gcp-deployment.md`.
+- The deploy script refuses obvious shared-service database secrets.
+- GCP inspection on 2026-05-27 found only these Secret Manager secrets:
+  `DB_PASSWORD`, `GOOGLE_CLIENT_ID`, `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY`, and
+  `chat-db-dsn-staging`.
+- GCP inspection on 2026-05-27 found only these Cloud SQL instances:
+  `auth-postgres` and `ontheblock-chat-staging`.
+
+Human-provided inputs needed:
+
+- dedicated recommendation PostgreSQL instance or dedicated database/user
+- Secret Manager secret containing the recommendation-owned `DATABASE_URL`
+- recommendation-owned Qdrant endpoint
+- Qdrant URL/API key secrets where required
+- Cloud Run runtime service account decision
+- Cloud Run ingress decision: private behind gateway or reviewed public staging
+  smoke path
+
+Acceptance evidence when unblocked:
+
+```text
+dedicated_recommendation_db = pass
+database_secret_created = pass
+qdrant_endpoint_configured = pass
+cloud_run_revision_ready = pass
+recommendation_deployed_smoke = pass
+```
+
 ## Non-Blocking Operational Note
 
 Local Qdrant smoke currently passes, but the local tool output warns that the
