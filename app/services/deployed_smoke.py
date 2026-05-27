@@ -84,6 +84,10 @@ def smoke_auth_metadata(env: Env) -> SmokeResult:
 
 
 def smoke_survey_service(env: Env) -> SmokeResult:
+    grpc_addr = env.get("SURVEY_SMOKE_GRPC_ADDR")
+    if grpc_addr:
+        return _smoke_survey_grpc(env, grpc_addr)
+
     base_url = _required_env(env, "SURVEY_SMOKE_BASE_URL")
     token = _required_env(env, "SMOKE_AUTH_BEARER_TOKEN")
     events_path = env.get(
@@ -106,6 +110,28 @@ def smoke_survey_service(env: Env) -> SmokeResult:
         name="survey",
         status="passed",
         detail=f"events={len(events)} has_more={payload.get('has_more')}",
+    )
+
+
+def _smoke_survey_grpc(env: Env, grpc_addr: str) -> SmokeResult:
+    timeout = _float_env(env, "SMOKE_GRPC_TIMEOUT_SECONDS", 10.0)
+    token = env.get("SMOKE_AUTH_BEARER_TOKEN")
+    metadata = (("authorization", f"Bearer {token}"),) if token else ()
+    with _grpc_channel(grpc_addr, env) as channel:
+        stub = health_pb2_grpc.HealthStub(channel)
+        response = stub.Check(
+            health_pb2.HealthCheckRequest(
+                service=env.get("SURVEY_SMOKE_HEALTH_SERVICE", ""),
+            ),
+            timeout=timeout,
+            metadata=metadata,
+        )
+    if response.status != health_pb2.HealthCheckResponse.SERVING:
+        raise RuntimeError(f"survey health status is not SERVING: {response.status}")
+    return SmokeResult(
+        name="survey",
+        status="passed",
+        detail="grpc_health=SERVING sync_contract=not_verified",
     )
 
 

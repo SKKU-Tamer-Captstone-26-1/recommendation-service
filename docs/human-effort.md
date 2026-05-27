@@ -10,21 +10,31 @@ production policy decisions.
 
 ### Deployed Survey-Service Smoke
 
-Status: external dependency required.
+Status: partially unblocked; deployed gRPC health is reachable, but the
+recommendation sync contract is not deployed yet.
 
 Current repo evidence:
 
 - Fake/protocol survey sync smoke exists in `app.tools.survey_sync_smoke`.
 - Local smoke can generate a derived profile and recommendation request log.
 - `recommendation-service` does not read the survey database directly.
+- Deployed `survey-service` Cloud Run URL is
+  `https://survey-service-vcuepibcwq-du.a.run.app`.
+- gRPC health on `survey-service-vcuepibcwq-du.a.run.app:443` returns
+  `SERVING`.
+- gRPC reflection exposes `GetSurveyQuestions`, `SubmitSurvey`,
+  `GetSurveyResult`, and `GetSurveyResultByUser`.
+- HTTP survey smoke paths currently return Cloud Run `502 protocol error`.
 
 Human-provided inputs needed:
 
-- deployed survey-service base URL or gRPC address
-- auth metadata or internal service credential required for the smoke
+- deployed survey-service recommendation sync contract:
+  `ListSurveyEvents` and `GetSurveyResponse`, or an approved adapter decision
+  for `GetSurveyResult` / `GetSurveyResultByUser`
+- auth metadata or internal service credential required for recommendation sync
+- a safe test survey response/event that may be read by recommendation-service
 - confirmation that the deployed event/response contract matches
   `docs/recommendation/sync-flow.md`
-- a safe test survey response/event that may be read by recommendation-service
 
 Acceptance evidence when unblocked:
 
