@@ -189,6 +189,9 @@ Current repo evidence:
 - Staging Qdrant HTTPS/API-key smoke passes with the application
   `qdrant-client` factory after the factory was fixed to stop forcing default
   port `6333` for full HTTPS URLs.
+- The default staging/local Qdrant image is aligned to `qdrant/qdrant:v1.18.0`
+  to match the Python `qdrant-client` minor version selected in the Cloud Run
+  job image.
 - Runtime IAM provisioning script exists at
   `scripts/deploy/gcp-provision-staging-runtime-iam.sh`.
 - Runtime IAM dry-run on 2026-05-27 reports DB/Qdrant secrets exist and the
@@ -201,9 +204,18 @@ Current repo evidence:
   DB/Qdrant secrets all exist.
 - Recommendation Cloud Run deploy preflight now passes with recommendation-owned
   DB/Qdrant secrets and Cloud SQL connection configuration.
+- Staging Cloud Run Job runner exists at
+  `scripts/deploy/gcp-run-staging-job.sh` for migration, seed promotion,
+  catalog audit, Qdrant rebuild, Qdrant smoke, and beverage recommendation
+  smoke.
+- Staging migration, seed promotion, catalog audit, Qdrant rebuild, Qdrant
+  smoke, and beverage recommendation smoke passed on 2026-05-27.
+- The remaining survey-side blocker is a safe deployed survey user or survey ID
+  for `app.tools.survey_result_adapter`.
 
 Human-provided inputs needed:
 
+- safe deployed survey test user ID or survey ID allowed for adapter smoke
 - Cloud Run ingress decision: private behind gateway or reviewed public staging
   smoke path
 
@@ -219,6 +231,6 @@ recommendation_deployed_smoke = pass
 
 ## Non-Blocking Operational Note
 
-Local Qdrant smoke currently passes, but the local tool output warns that the
-Python `qdrant-client` minor version is newer than the Docker Qdrant server
-minor version. Align the production client/server versions before public launch.
+Qdrant remains staging-only and rebuildable from recommendation PostgreSQL. Move
+from temporary Cloud Run Qdrant to Qdrant Cloud or another persistent managed
+deployment before public production launch.

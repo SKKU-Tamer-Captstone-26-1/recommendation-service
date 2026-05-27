@@ -121,7 +121,7 @@ Defaults:
 
 ```text
 service = recommendation-qdrant-staging
-image = docker.io/qdrant/qdrant:v1.12.4
+image = docker.io/qdrant/qdrant:v1.18.0
 api_key_secret = recommendation-qdrant-api-key-staging
 url_secret = recommendation-qdrant-url-staging
 service_account = recommendation-qdrant-staging
@@ -157,6 +157,39 @@ secret_access = recommendation-db-dsn-staging,
   recommendation-qdrant-url-staging,
   recommendation-qdrant-api-key-staging
 ```
+
+## Staging Release Jobs
+
+Run one release-prep job at a time:
+
+```bash
+RECOMMENDATION_JOB_MODE=migrate \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-run-staging-job.sh
+
+RECOMMENDATION_JOB_MODE=seed \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-run-staging-job.sh
+
+RECOMMENDATION_JOB_MODE=catalog-audit \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-run-staging-job.sh
+
+RECOMMENDATION_JOB_MODE=qdrant-rebuild \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-run-staging-job.sh
+
+RECOMMENDATION_JOB_MODE=qdrant-smoke \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-run-staging-job.sh
+
+RECOMMENDATION_JOB_MODE=beverage-smoke \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-run-staging-job.sh
+```
+
+Jobs run with the `recommendation-service-staging` service account, the Cloud
+SQL connector, and recommendation-owned DB/Qdrant secrets.
 
 ## Verification
 

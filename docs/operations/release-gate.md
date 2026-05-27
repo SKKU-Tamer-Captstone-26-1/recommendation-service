@@ -187,6 +187,23 @@ bash scripts/deploy/gcp-provision-staging-runtime-iam.sh
 Only run it with `RECOMMENDATION_RUNTIME_IAM_APPLY=1` after the
 recommendation-owned DB/Qdrant secrets exist.
 
+Run staging release-prep jobs in order:
+
+```bash
+RECOMMENDATION_JOB_MODE=migrate GCP_PROJECT=on-the-block-2026 \
+  bash scripts/deploy/gcp-run-staging-job.sh
+RECOMMENDATION_JOB_MODE=seed GCP_PROJECT=on-the-block-2026 \
+  bash scripts/deploy/gcp-run-staging-job.sh
+RECOMMENDATION_JOB_MODE=catalog-audit GCP_PROJECT=on-the-block-2026 \
+  bash scripts/deploy/gcp-run-staging-job.sh
+RECOMMENDATION_JOB_MODE=qdrant-rebuild GCP_PROJECT=on-the-block-2026 \
+  bash scripts/deploy/gcp-run-staging-job.sh
+RECOMMENDATION_JOB_MODE=qdrant-smoke GCP_PROJECT=on-the-block-2026 \
+  bash scripts/deploy/gcp-run-staging-job.sh
+RECOMMENDATION_JOB_MODE=beverage-smoke GCP_PROJECT=on-the-block-2026 \
+  bash scripts/deploy/gcp-run-staging-job.sh
+```
+
 ## Operations Metrics Endpoint
 
 The HTTP API exposes:

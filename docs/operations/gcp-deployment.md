@@ -126,7 +126,7 @@ The script creates or confirms:
 
 ```text
 service = recommendation-qdrant-staging
-image = docker.io/qdrant/qdrant:v1.12.4
+image = docker.io/qdrant/qdrant:v1.18.0
 api_key_secret = recommendation-qdrant-api-key-staging
 url_secret = recommendation-qdrant-url-staging
 service_account = recommendation-qdrant-staging
@@ -259,17 +259,37 @@ recommendation gRPC service still verifies bearer auth metadata.
 
 ## Migrate, Seed, and Rebuild
 
-After the dedicated database exists and before serving Flutter traffic:
+After the dedicated database, Qdrant, and runtime IAM exist, run these Cloud Run
+Jobs before serving Flutter traffic:
 
 ```bash
-DATABASE_URL=<recommendation-owned-dsn> python3 -m alembic upgrade head
-DATABASE_URL=<recommendation-owned-dsn> python3 -m app.tools.beverage_import --stage --promote-seed
-DATABASE_URL=<recommendation-owned-dsn> python3 -m app.tools.beverage_catalog_audit --database
-DATABASE_URL=<recommendation-owned-dsn> python3 -m app.tools.qdrant_rebuild --owner-type beverage_item --recreate
+RECOMMENDATION_JOB_MODE=migrate \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-run-staging-job.sh
+
+RECOMMENDATION_JOB_MODE=seed \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-run-staging-job.sh
+
+RECOMMENDATION_JOB_MODE=catalog-audit \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-run-staging-job.sh
+
+RECOMMENDATION_JOB_MODE=qdrant-rebuild \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-run-staging-job.sh
+
+RECOMMENDATION_JOB_MODE=qdrant-smoke \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-run-staging-job.sh
+
+RECOMMENDATION_JOB_MODE=beverage-smoke \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-run-staging-job.sh
 ```
 
-The actual secret value must be read from Secret Manager or injected by the
-deployment environment. Do not paste real DSNs into committed files.
+The jobs use the Cloud SQL connector and Secret Manager injection. Do not paste
+real DSNs into committed files.
 
 ## Survey Adapter Smoke
 

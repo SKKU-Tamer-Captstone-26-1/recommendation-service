@@ -71,7 +71,7 @@ require_command openssl
 PROJECT="${GCP_PROJECT:-$(project_from_gcloud)}"
 REGION="${GCP_REGION:-asia-northeast3}"
 SERVICE="${RECOMMENDATION_QDRANT_SERVICE:-recommendation-qdrant-staging}"
-IMAGE="${RECOMMENDATION_QDRANT_IMAGE:-docker.io/qdrant/qdrant:v1.12.4}"
+IMAGE="${RECOMMENDATION_QDRANT_IMAGE:-docker.io/qdrant/qdrant:v1.18.0}"
 API_KEY_SECRET="${RECOMMENDATION_QDRANT_API_KEY_SECRET:-recommendation-qdrant-api-key-staging}"
 URL_SECRET="${RECOMMENDATION_QDRANT_URL_SECRET:-recommendation-qdrant-url-staging}"
 SERVICE_ACCOUNT_ID="${RECOMMENDATION_QDRANT_SERVICE_ACCOUNT_ID:-recommendation-qdrant-staging}"
