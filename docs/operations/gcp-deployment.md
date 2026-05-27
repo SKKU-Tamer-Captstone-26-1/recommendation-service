@@ -382,6 +382,39 @@ python3 -m app.tools.deployed_smoke --mode recommendation
 beverage result using allowlisted smoke metadata. This completes the staging
 Flutter call sequence through `RecordRecommendationEvent`.
 
+## Plan 012 Acceptance Runner
+
+Use the guarded runner when the safe survey user, matching safe auth token, and
+write approval are available:
+
+```bash
+PLAN012_SAFE_SURVEY_EXTERNAL_USER_ID=<safe-user-id> \
+SMOKE_AUTH_BEARER_TOKEN=<safe-staging-token-for-same-user> \
+PLAN012_ALLOW_PROFILE_WRITE=1 \
+PLAN012_ALLOW_EVENT_WRITE=1 \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-run-plan-012-acceptance.sh
+```
+
+Use `PLAN012_SAFE_SURVEY_RESPONSE_ID=<safe-survey-id>` instead of
+`PLAN012_SAFE_SURVEY_EXTERNAL_USER_ID` when validating by survey response ID.
+In that mode, also set `PLAN012_EXPECTED_EXTERNAL_USER_ID=<safe-user-id>` so
+the runner can prove the auth token and survey result belong to the same safe
+user.
+
+The runner performs:
+
+```text
+1. auth-service gRPC GetPublicKeys and ValidateToken user check
+2. survey-service gRPC health plus SurveyResult mapper contract check
+3. staging survey adapter Cloud Run Job to generate the derived profile
+4. deployed recommendation GetProfileStatus, GetBeverageRecommendations, and
+   RecordRecommendationEvent
+```
+
+Set `PLAN012_PROFILE_ALREADY_ACTIVE=1` only when the profile was already
+generated through the deployed survey adapter and should not be written again.
+
 Current deployed evidence:
 
 ```text

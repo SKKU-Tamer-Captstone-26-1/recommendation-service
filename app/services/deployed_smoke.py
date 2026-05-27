@@ -119,7 +119,13 @@ def _smoke_auth_grpc(env: Env, addr: str) -> SmokeResult:
                     "auth ValidateToken rejected smoke token: "
                     f"{token_response.reason or 'token invalid'}",
                 )
-            details.append("token_valid=true")
+            expected_user_id = env.get("AUTH_SMOKE_EXPECTED_USER_ID")
+            if expected_user_id and token_response.user_id != expected_user_id:
+                raise RuntimeError("auth ValidateToken returned unexpected user_id")
+            if expected_user_id:
+                details.append("token_user_id_verified=true")
+            else:
+                details.append("token_valid=true")
     return SmokeResult(name="auth", status="passed", detail=" ".join(details))
 
 
@@ -219,10 +225,15 @@ def _smoke_survey_result_contract(
             metadata=metadata,
         )
     mapped = survey_result_to_response(response.result)
+    expected_user_id = env.get("SURVEY_SMOKE_EXPECTED_USER_ID")
+    if expected_user_id and mapped.external_user_id != expected_user_id:
+        raise RuntimeError("survey result returned unexpected user_id")
+    user_detail = " survey_user_id_verified=true" if expected_user_id else ""
     return (
         "survey_result_contract=verified "
         f"survey_id={mapped.survey_response_id} "
         f"categories={len(mapped.answers.get('categories') or [])}"
+        f"{user_detail}"
     )
 
 

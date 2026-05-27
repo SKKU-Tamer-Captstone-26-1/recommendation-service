@@ -32,10 +32,14 @@ Current repo evidence:
 - The adapter now matches the deployed category-key survey contract and
   normalizes `cognac` to internal `brandy_cognac` plus the deployed `*_k`
   budget labels.
+- The deployed smoke can verify a safe `SurveyResult` through the mapper without
+  writing a profile, and can assert the survey user ID when
+  `SURVEY_SMOKE_EXPECTED_USER_ID` is set.
 
 Human-provided inputs needed:
 
 - safe deployed survey test user ID or survey ID allowed for adapter smoke
+- expected safe auth/survey user ID when validating by survey ID
 - auth metadata or internal service credential required for recommendation sync
 - deployed survey-service recommendation sync contract:
   `ListSurveyEvents` and `GetSurveyResponse`
@@ -93,6 +97,8 @@ Current repo evidence:
 - recommendation-service now supports `AUTH_TOKEN_VALIDATION_MODE=grpc`, which
   calls auth-service `ValidateToken` instead of issuing or decoding tokens as a
   data owner.
+- The auth deployed smoke can validate a safe token through `ValidateToken` and
+  assert the resolved user when `AUTH_SMOKE_EXPECTED_USER_ID` is set.
 
 Human-provided inputs needed:
 
@@ -240,11 +246,16 @@ Current repo evidence:
 - `GetProfileStatus` with an invalid bearer token returns `UNAUTHENTICATED`
   with auth-service reason `TOKEN_INVALID`.
 - Flutter handoff is documented in `docs/api/flutter-handoff.md`.
+- `scripts/deploy/gcp-run-plan-012-acceptance.sh` now runs the remaining Plan
+  012 gates in order when a safe survey user/response, matching auth token, and
+  explicit profile/event write opt-ins are provided.
 
 Human-provided inputs needed:
 
 - safe deployed survey test user ID or survey ID allowed for adapter smoke
 - safe auth-service JWT for deployed recommendation smoke
+- confirmation that the safe auth token resolves to the same user as the safe
+  survey result
 - Cloud Run ingress decision: private behind gateway or reviewed public staging
   smoke path
 

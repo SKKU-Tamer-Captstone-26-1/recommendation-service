@@ -109,10 +109,12 @@ Useful environment variables:
 
 ```text
 AUTH_SMOKE_JWKS_URL
+AUTH_SMOKE_EXPECTED_USER_ID
 SURVEY_SMOKE_BASE_URL
 SURVEY_SMOKE_GRPC_ADDR
 SURVEY_SMOKE_EXTERNAL_USER_ID
 SURVEY_SMOKE_RESPONSE_ID
+SURVEY_SMOKE_EXPECTED_USER_ID
 MAP_SMOKE_BASE_URL
 RECOMMENDATION_SMOKE_GRPC_ADDR
 RECOMMENDATION_SMOKE_HEALTH_ONLY
@@ -133,6 +135,9 @@ set, the survey gRPC smoke calls `GetSurveyResultByUser` or `GetSurveyResult`
 and validates the returned `SurveyResult` through the recommendation mapper
 adapter without writing a profile.
 
+Set `SURVEY_SMOKE_EXPECTED_USER_ID` when the safe survey response must be proven
+to belong to the same auth user used by the recommendation smoke.
+
 If `RECOMMENDATION_SMOKE_HEALTH_ONLY=true` is set, the recommendation deployed
 smoke checks gRPC health without requiring a user JWT. This confirms Cloud Run
 gRPC reachability only; full profile and recommendation RPC evidence still
@@ -147,6 +152,8 @@ recommendations, and feedback recording in one deployed smoke.
 If `AUTH_SMOKE_GRPC_ADDR` is set, the auth deployed smoke checks auth-service
 gRPC `GetPublicKeys`. This confirms auth-service gRPC reachability and public
 key availability without requiring recommendation-service to own JWT issuance.
+When `SMOKE_AUTH_BEARER_TOKEN` and `AUTH_SMOKE_EXPECTED_USER_ID` are also set,
+it validates that auth-service resolves the safe token to the expected user.
 
 ## Optional Cloud Run Deploy Gate
 

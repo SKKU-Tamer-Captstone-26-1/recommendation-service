@@ -252,3 +252,19 @@ RECOMMENDATION_SMOKE_EXPECT_ACTIVE_PROFILE=true
 RECOMMENDATION_SMOKE_RUN_BEVERAGE=true
 RECOMMENDATION_SMOKE_RECORD_EVENT=true
 ```
+
+For the complete Plan 012 staging acceptance, use the guarded runner with a safe
+survey user and matching safe auth token:
+
+```bash
+PLAN012_SAFE_SURVEY_EXTERNAL_USER_ID=<safe-user-id> \
+SMOKE_AUTH_BEARER_TOKEN=<safe-staging-token-for-same-user> \
+PLAN012_ALLOW_PROFILE_WRITE=1 \
+PLAN012_ALLOW_EVENT_WRITE=1 \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-run-plan-012-acceptance.sh
+```
+
+Use `PLAN012_SAFE_SURVEY_RESPONSE_ID=<safe-survey-id>` plus
+`PLAN012_EXPECTED_EXTERNAL_USER_ID=<safe-user-id>` when validating by survey
+response ID.

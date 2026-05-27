@@ -85,6 +85,51 @@ def test_auth_smoke_can_verify_grpc_public_keys(monkeypatch) -> None:
     assert captured["timeout"] == 3.0
 
 
+def test_auth_smoke_can_verify_grpc_token_user(monkeypatch) -> None:
+    class FakeChannel:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    class FakeAuthStub:
+        def __init__(self, channel) -> None:
+            pass
+
+        def GetPublicKeys(self, request, *, timeout):
+            return auth_pb2.GetPublicKeysResponse(
+                keys=[auth_pb2.PublicKeyEntry(kid="kid_1", public_key_pem="pem")],
+            )
+
+        def ValidateToken(self, request, *, timeout):
+            return auth_pb2.ValidateTokenResponse(
+                valid=True,
+                user_id="usr_123",
+            )
+
+    monkeypatch.setattr(
+        deployed_smoke,
+        "_grpc_channel",
+        lambda addr, env: FakeChannel(),
+    )
+    monkeypatch.setattr(deployed_smoke.auth_pb2_grpc, "AuthServiceStub", FakeAuthStub)
+
+    result = deployed_smoke.smoke_auth_metadata(
+        {
+            "AUTH_SMOKE_GRPC_ADDR": "authorization-service.example:443",
+            "SMOKE_AUTH_BEARER_TOKEN": "token",
+            "AUTH_SMOKE_EXPECTED_USER_ID": "usr_123",
+        },
+    )
+
+    assert result == SmokeResult(
+        name="auth",
+        status="passed",
+        detail="public_keys=1 token_user_id_verified=true",
+    )
+
+
 def test_survey_smoke_can_verify_grpc_health(monkeypatch) -> None:
     captured: dict[str, object] = {}
 
@@ -183,6 +228,7 @@ def test_survey_smoke_can_verify_grpc_result_contract(monkeypatch) -> None:
         {
             "SURVEY_SMOKE_GRPC_ADDR": "survey-service.example:443",
             "SURVEY_SMOKE_EXTERNAL_USER_ID": "usr_123",
+            "SURVEY_SMOKE_EXPECTED_USER_ID": "usr_123",
         },
     )
 
@@ -191,7 +237,7 @@ def test_survey_smoke_can_verify_grpc_result_contract(monkeypatch) -> None:
         status="passed",
         detail=(
             "grpc_health=SERVING survey_result_contract=verified "
-            "survey_id=survey_123 categories=2"
+            "survey_id=survey_123 categories=2 survey_user_id_verified=true"
         ),
     )
     assert captured["user_id"] == "usr_123"
