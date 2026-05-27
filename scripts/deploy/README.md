@@ -191,6 +191,36 @@ bash scripts/deploy/gcp-run-staging-job.sh
 Jobs run with the `recommendation-service-staging` service account, the Cloud
 SQL connector, and recommendation-owned DB/Qdrant secrets.
 
+When a safe deployed survey user or survey response is available, generate the
+derived staging profile through the deployed survey-service adapter:
+
+```bash
+RECOMMENDATION_JOB_MODE=survey-adapter-user \
+RECOMMENDATION_SURVEY_ADAPTER_EXTERNAL_USER_ID=<safe-user-id> \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-run-staging-job.sh
+```
+
+or:
+
+```bash
+RECOMMENDATION_JOB_MODE=survey-adapter-response \
+RECOMMENDATION_SURVEY_ADAPTER_RESPONSE_ID=<safe-survey-id> \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-run-staging-job.sh
+```
+
+Set `RECOMMENDATION_SURVEY_ADAPTER_DRY_RUN=1` to validate mapping without
+writing a profile. If survey-service requires a bearer credential, store it in
+a recommendation-owned secret and set:
+
+```text
+SURVEY_SERVICE_GRPC_AUTH_BEARER_TOKEN_SECRET=recommendation-survey-grpc-token-staging
+```
+
+The adapter uses `survey_mapper_v1_1` and normalizes deployed category-key
+answers, including `cognac -> brandy_cognac` and `*_k` budget labels.
+
 ## Verification
 
 After deployment, run:

@@ -155,7 +155,7 @@ python3 -m app.tools.survey_result_adapter \
   --dry-run
 ```
 
-The adapter maps `SurveyResult` to the existing `survey_v1` mapper input:
+The adapter maps `SurveyResult` to the `survey_v1` profile input:
 
 | SurveyResult field | Mapper input |
 |---|---|
@@ -167,6 +167,33 @@ The adapter maps `SurveyResult` to the existing `survey_v1` mapper input:
 | `flavor_keywords` | `answers.global_keywords` |
 | `budget` | `answers.budget_range` |
 | `submitted_at` | `completed_at` |
+
+The deployed survey answer keys are category-based, not question-number based.
+`survey_mapper_v1_1` accepts the 2026-05-26 value set:
+
+```text
+level = beginner | enthusiast | expert
+categories = whiskey | wine | cognac | cocktail | beer
+whiskey = bourbon_character | sherry_character | peat_character | floral_citrus | american_whiskey
+wine = full_red | light_red_rose | white | sparkling | fortified
+cocktail = tropical_tiki | tart_balanced | refreshing_long | dessert_cream | bold_spirit_fwd
+beer = lager_pilsner | weizen_white | pale_ale_ipa | stout_porter | sour_wild
+flavor_keywords = vanilla_caramel | citrus_berry | dried_choco | oak_woody | smoky_peated | almond_nutty | floral | spicy | herb_mint
+budget = under_30k | 30k_100k | 100k_200k | over_200k
+```
+
+Normalization rules:
+
+- `cognac` is stored as internal category `brandy_cognac`.
+- `cognac` has no sub-preference array in the deployed contract.
+- Empty `whiskey`, `wine`, `cocktail`, or `beer` arrays are omitted from
+  `answers.category_traits`.
+- Budget labels are normalized to numeric internal ranges:
+  `under_30000`, `30000_100000`, `100000_200000`, `over_200000`.
+
+Direct SQL against `survey.survey_responses` is allowed only as a
+survey-service operator/debugging action. It is forbidden as a
+recommendation-service integration path.
 
 This adapter MUST NOT be treated as production sync. It has no durable cursor,
 event ID stream, response revision, revocation event, or schema-published event.

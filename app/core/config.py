@@ -75,7 +75,7 @@ class Settings(BaseSettings):
     default_recommendation_limit: int = 20
     default_venue_radius_meters: int = 3000
     active_vector_schema: str = "taste_v1"
-    active_survey_mapper: str = "survey_mapper_v1"
+    active_survey_mapper: str = "survey_mapper_v1_1"
     active_scoring_config: str = "scoring_v1"
 
     request_id_header: str = "X-Request-ID"

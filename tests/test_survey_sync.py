@@ -215,12 +215,13 @@ def test_survey_result_adapter_maps_deployed_grpc_shape() -> None:
     result = survey_pb2.SurveyResult(
         survey_id="survey_123",
         user_id="usr_123",
-        level="beginner",
-        categories=["whiskey", "beer"],
-        whiskey=["vanilla_caramel", "oak_woody"],
-        beer=["citrus_berry"],
-        flavor_keywords=["vanilla_caramel", "citrus_berry"],
-        budget="30000_100000",
+        level="expert",
+        categories=["whiskey", "wine", "cognac", "beer", "cocktail"],
+        whiskey=["bourbon_character", "sherry_character", "peat_character"],
+        wine=["full_red", "sparkling"],
+        beer=["lager_pilsner", "pale_ale_ipa"],
+        flavor_keywords=["vanilla_caramel", "citrus_berry", "dried_choco"],
+        budget="over_200k",
     )
     result.submitted_at.FromDatetime(submitted_at)
 
@@ -232,14 +233,19 @@ def test_survey_result_adapter_maps_deployed_grpc_shape() -> None:
     assert response.response_revision == 1
     assert response.completed_at == submitted_at
     assert response.answers == {
-        "experience_level": "beginner",
-        "categories": ["whiskey", "beer"],
+        "experience_level": "expert",
+        "categories": ["whiskey", "wine", "brandy_cognac", "beer", "cocktail"],
         "category_traits": {
-            "whiskey": ["vanilla_caramel", "oak_woody"],
-            "beer": ["citrus_berry"],
+            "whiskey": [
+                "bourbon_character",
+                "sherry_character",
+                "peat_character",
+            ],
+            "wine": ["full_red", "sparkling"],
+            "beer": ["lager_pilsner", "pale_ale_ipa"],
         },
-        "global_keywords": ["vanilla_caramel", "citrus_berry"],
-        "budget_range": "30000_100000",
+        "global_keywords": ["vanilla_caramel", "citrus_berry", "dried_choco"],
+        "budget_range": "over_200000",
         "source_contract": "ontheblock.survey.v1.SurveyResult",
     }
 

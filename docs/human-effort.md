@@ -29,6 +29,9 @@ Current repo evidence:
   `GetSurveyResultByUser` to generate a derived profile for a safe test user.
   This adapter is not production event sync because it has no cursor/event ID
   stream.
+- The adapter now matches the deployed category-key survey contract and
+  normalizes `cognac` to internal `brandy_cognac` plus the deployed `*_k`
+  budget labels.
 
 Human-provided inputs needed:
 

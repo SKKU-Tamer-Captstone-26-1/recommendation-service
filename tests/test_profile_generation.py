@@ -14,7 +14,7 @@ from app.services.profile_generation import (
 )
 
 
-def test_survey_mapper_v1_generates_taste_v1_profile() -> None:
+def test_survey_mapper_v1_1_generates_taste_v1_profile() -> None:
     survey_input = SurveyProfileInput(
         survey_response_id="surv_resp_123",
         external_user_id="usr_123",
@@ -26,7 +26,7 @@ def test_survey_mapper_v1_generates_taste_v1_profile() -> None:
             "categories": ["whiskey", "cocktail"],
             "category_traits": {"whiskey": ["smoky_peat"], "cocktail": ["sour"]},
             "global_keywords": ["vanilla_caramel", "nutty"],
-            "budget_range": "30000_100000",
+            "budget_range": "30k_100k",
         },
     )
 
@@ -40,6 +40,42 @@ def test_survey_mapper_v1_generates_taste_v1_profile() -> None:
     assert generated.preferred_keywords == ["vanilla_caramel", "nutty"]
     assert generated.budget_range == "30000_100000"
     assert generated.source_snapshot_hash
+
+
+def test_survey_mapper_v1_1_maps_deployed_survey_tokens() -> None:
+    survey_input = SurveyProfileInput(
+        survey_response_id="surv_resp_456",
+        external_user_id="usr_456",
+        survey_version="survey_v1",
+        response_revision=1,
+        completed_at=datetime(2026, 5, 27, tzinfo=UTC),
+        answers={
+            "experience_level": "expert",
+            "categories": ["cognac", "beer", "cognac"],
+            "category_traits": {
+                "whiskey": ["peat_character", "floral_citrus"],
+                "beer": ["stout_porter", "sour_wild"],
+            },
+            "global_keywords": [
+                "dried_choco",
+                "smoky_peated",
+                "almond_nutty",
+                "herb_mint",
+            ],
+            "budget_range": "over_200k",
+        },
+    )
+
+    generated = SurveyMapperV1().map(survey_input)
+
+    assert generated.preferred_categories == ["brandy_cognac", "beer"]
+    assert generated.budget_range == "over_200000"
+    assert generated.taste_vector_json["dried_fruit"] >= 0.75
+    assert generated.taste_vector_json["smoky"] >= 0.85
+    assert generated.taste_vector_json["nutty"] >= 0.8
+    assert generated.taste_vector_json["herbal"] >= 0.8
+    assert generated.taste_vector_json["roasted"] >= 0.8
+    assert generated.taste_vector_json["acidity"] >= 0.85
 
 
 def test_profile_generation_is_idempotent_for_same_response_mapper() -> None:
@@ -70,7 +106,7 @@ def test_profile_generation_is_idempotent_for_same_response_mapper() -> None:
         MapperVersion(
             id=mapper_id,
             name="survey_mapper",
-            version="survey_mapper_v1",
+            version="survey_mapper_v1_1",
             compatible_vector_schema="taste_v1",
             rules_json={},
             status="active",

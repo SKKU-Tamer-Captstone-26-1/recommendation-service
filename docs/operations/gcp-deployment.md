@@ -291,6 +291,38 @@ bash scripts/deploy/gcp-run-staging-job.sh
 The jobs use the Cloud SQL connector and Secret Manager injection. Do not paste
 real DSNs into committed files.
 
+When a safe deployed survey user or survey response is available, generate the
+staging profile through the deployed survey adapter:
+
+```bash
+RECOMMENDATION_JOB_MODE=survey-adapter-user \
+RECOMMENDATION_SURVEY_ADAPTER_EXTERNAL_USER_ID=<safe-user-id> \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-run-staging-job.sh
+```
+
+or:
+
+```bash
+RECOMMENDATION_JOB_MODE=survey-adapter-response \
+RECOMMENDATION_SURVEY_ADAPTER_RESPONSE_ID=<safe-survey-id> \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-run-staging-job.sh
+```
+
+Set:
+
+```text
+RECOMMENDATION_SURVEY_ADAPTER_DRY_RUN=1
+```
+
+to validate mapping without writing a profile. If survey-service requires a
+bearer credential, store it in a recommendation-owned secret and set:
+
+```text
+SURVEY_SERVICE_GRPC_AUTH_BEARER_TOKEN_SECRET=recommendation-survey-grpc-token-staging
+```
+
 ## Survey Adapter Smoke
 
 When a safe deployed survey user or survey ID is available:
@@ -304,7 +336,10 @@ python3 -m app.tools.survey_result_adapter \
 ```
 
 This creates a derived recommendation profile from the deployed survey result.
-It is staging-only and does not replace cursor-based production sync.
+It is staging-only and does not replace cursor-based production sync. The
+adapter uses `survey_mapper_v1_1`, which normalizes deployed category-key
+answers such as `cognac` and `over_200k` into the recommendation-owned mapper
+shape.
 
 ## Deployed Smoke
 

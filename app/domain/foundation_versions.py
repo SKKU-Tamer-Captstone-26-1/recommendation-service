@@ -10,7 +10,9 @@ from app.domain.vector_schema import (
 )
 
 ACTIVE_STATUS = "active"
+DEPRECATED_STATUS = "deprecated"
 SURVEY_MAPPER_V1 = "survey_mapper_v1"
+SURVEY_MAPPER_V1_1 = "survey_mapper_v1_1"
 SCORING_V1 = "scoring_v1"
 
 
@@ -44,12 +46,34 @@ def survey_mapper_v1_payload() -> dict[str, Any]:
         "name": "survey_mapper",
         "version": SURVEY_MAPPER_V1,
         "compatible_vector_schema": TASTE_V1_NAME,
-        "status": ACTIVE_STATUS,
+        "status": DEPRECATED_STATUS,
         "rules_json": {
             "source_doc": "docs/recommendation/survey-mapping.md",
             "vector_schema": TASTE_V1_NAME,
             "input_contract": "survey_v1",
             "snapshot_policy": "redacted_generation_evidence_only",
+        },
+    }
+
+
+def survey_mapper_v1_1_payload() -> dict[str, Any]:
+    return {
+        "name": "survey_mapper",
+        "version": SURVEY_MAPPER_V1_1,
+        "compatible_vector_schema": TASTE_V1_NAME,
+        "status": ACTIVE_STATUS,
+        "rules_json": {
+            "source_doc": "docs/recommendation/survey-mapping.md",
+            "vector_schema": TASTE_V1_NAME,
+            "input_contract": "ontheblock.survey.v1.SurveyResult",
+            "snapshot_policy": "redacted_generation_evidence_only",
+            "normalization": {
+                "cognac": "brandy_cognac",
+                "under_30k": "under_30000",
+                "30k_100k": "30000_100000",
+                "100k_200k": "100000_200000",
+                "over_200k": "over_200000",
+            },
         },
     }
 
@@ -113,9 +137,12 @@ def scoring_v1_payloads() -> tuple[dict[str, Any], ...]:
 
 __all__ = [
     "ACTIVE_STATUS",
+    "DEPRECATED_STATUS",
     "SCORING_V1",
     "SURVEY_MAPPER_V1",
+    "SURVEY_MAPPER_V1_1",
     "scoring_v1_payloads",
+    "survey_mapper_v1_1_payload",
     "survey_mapper_v1_payload",
     "taste_v1_vector_schema_payload",
 ]

@@ -16,7 +16,7 @@ def test_foundation_service_reports_ready_when_active_versions_exist() -> None:
     )
     repository.get_active_mapper_version.return_value = MapperVersion(
         name="survey_mapper",
-        version="survey_mapper_v1",
+        version="survey_mapper_v1_1",
         compatible_vector_schema="taste_v1",
         rules_json={},
     )
@@ -58,7 +58,7 @@ def test_foundation_service_reports_missing_version_records() -> None:
     assert not state.is_ready
     assert state.missing_keys == (
         "vector_schema:taste_v1",
-        "mapper:survey_mapper_v1",
+        "mapper:survey_mapper_v1_1",
         "scoring:scoring_v1:beverage",
         "scoring:scoring_v1:venue",
     )

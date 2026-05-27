@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.domain.vector_schema import TASTE_V1_DIMENSIONS, TASTE_V1_NAME
 from app.models.enums import ProfileStatus, VectorOwnerType
 from app.models.profile import (
@@ -23,14 +24,43 @@ KEYWORD_DIMENSION_WEIGHTS: dict[str, dict[str, float]] = {
     "vanilla_caramel": {"sweet": 0.85, "woody": 0.55},
     "citrus_berry": {"fruity": 0.8, "acidity": 0.65},
     "dried_fruit_chocolate": {"dried_fruit": 0.75, "roasted": 0.55, "sweet": 0.4},
+    "dried_choco": {"dried_fruit": 0.75, "roasted": 0.55, "sweet": 0.4},
     "oak_woody": {"woody": 0.8, "spicy": 0.45, "tannin": 0.45},
     "smoky_peat": {"smoky": 0.85, "alcohol_intensity": 0.5},
+    "smoky_peated": {"smoky": 0.85, "alcohol_intensity": 0.5},
     "nutty": {"nutty": 0.8, "body": 0.45},
+    "almond_nutty": {"nutty": 0.8, "body": 0.45},
     "floral": {"floral": 0.8},
     "spicy": {"spicy": 0.8, "woody": 0.35},
     "herbal_mint": {"herbal": 0.8, "bitterness": 0.4},
+    "herb_mint": {"herbal": 0.8, "bitterness": 0.4},
     "sour": {"acidity": 0.75, "fruity": 0.35},
     "spirit_forward": {"alcohol_intensity": 0.75, "body": 0.45},
+    "bold_spirit_fwd": {"alcohol_intensity": 0.8, "body": 0.5, "woody": 0.35},
+    "bourbon_character": {"sweet": 0.75, "woody": 0.65, "spicy": 0.45, "body": 0.4},
+    "sherry_character": {"dried_fruit": 0.75, "sweet": 0.45, "woody": 0.45},
+    "peat_character": {"smoky": 0.85, "alcohol_intensity": 0.55, "woody": 0.35},
+    "floral_citrus": {"floral": 0.65, "fruity": 0.6, "acidity": 0.45},
+    "american_whiskey": {"woody": 0.65, "sweet": 0.55, "spicy": 0.45, "body": 0.4},
+    "full_red": {"tannin": 0.7, "body": 0.55, "dried_fruit": 0.45},
+    "light_red_rose": {"fruity": 0.65, "acidity": 0.55, "floral": 0.4},
+    "white": {"acidity": 0.65, "fruity": 0.55, "floral": 0.35},
+    "sparkling": {"carbonation": 0.85, "acidity": 0.55, "fruity": 0.35},
+    "fortified": {
+        "dried_fruit": 0.65,
+        "sweet": 0.55,
+        "alcohol_intensity": 0.55,
+        "body": 0.45,
+    },
+    "tropical_tiki": {"fruity": 0.7, "sweet": 0.65, "acidity": 0.4},
+    "tart_balanced": {"acidity": 0.75, "fruity": 0.45, "sweet": 0.35},
+    "refreshing_long": {"carbonation": 0.55, "acidity": 0.45, "herbal": 0.35},
+    "dessert_cream": {"sweet": 0.8, "body": 0.6, "nutty": 0.35},
+    "lager_pilsner": {"carbonation": 0.65, "bitterness": 0.45, "body": 0.25},
+    "pale_ale_ipa": {"bitterness": 0.75, "fruity": 0.5, "herbal": 0.35},
+    "stout_porter": {"roasted": 0.8, "body": 0.6, "bitterness": 0.4},
+    "weizen_white": {"carbonation": 0.6, "fruity": 0.5, "floral": 0.35},
+    "sour_wild": {"acidity": 0.85, "fruity": 0.45, "herbal": 0.25},
 }
 
 CATEGORY_BASE_WEIGHTS: dict[str, dict[str, float]] = {
@@ -46,6 +76,17 @@ CATEGORY_BASE_WEIGHTS: dict[str, dict[str, float]] = {
     "sake_shochu": {"body": 0.25, "fruity": 0.25, "alcohol_intensity": 0.25},
     "tequila_mezcal": {"herbal": 0.25, "spicy": 0.25, "alcohol_intensity": 0.35},
     "traditional_korean_alcohol": {"sweet": 0.3, "body": 0.25, "acidity": 0.25},
+}
+
+SURVEY_CATEGORY_ALIASES = {
+    "cognac": "brandy_cognac",
+}
+
+SURVEY_BUDGET_ALIASES = {
+    "under_30k": "under_30000",
+    "30k_100k": "30000_100000",
+    "100k_200k": "100000_200000",
+    "over_200k": "over_200000",
 }
 
 
@@ -77,13 +118,11 @@ class SurveyMapperV1:
 
     def map(self, survey_input: SurveyProfileInput) -> GeneratedProfile:
         answers = survey_input.answers
-        categories = _string_list(answers.get("categories"))
+        categories = canonicalize_survey_categories(answers.get("categories"))
         keywords = _string_list(answers.get("global_keywords"))
         experience_level = _optional_string(answers.get("experience_level"))
-        budget_range = _optional_string(answers.get("budget_range"))
-        category_traits = answers.get("category_traits")
-        if not isinstance(category_traits, dict):
-            category_traits = {}
+        budget_range = canonicalize_survey_budget_range(answers.get("budget_range"))
+        category_traits = _canonical_category_traits(answers.get("category_traits"))
 
         scores = {dimension.name: 0.0 for dimension in TASTE_V1_DIMENSIONS}
         evidence_count = {dimension.name: 0 for dimension in TASTE_V1_DIMENSIONS}
@@ -157,8 +196,7 @@ class ProfileGenerationService:
         mapper_version = _active_mapper(self._session)
         existing_profile = self._session.scalar(
             select(TasteProfileRevision).where(
-                TasteProfileRevision.external_user_id
-                == survey_input.external_user_id,
+                TasteProfileRevision.external_user_id == survey_input.external_user_id,
                 TasteProfileRevision.survey_response_id
                 == survey_input.survey_response_id,
                 TasteProfileRevision.survey_response_revision
@@ -260,15 +298,56 @@ class ProfileGenerationService:
 
 
 def _active_mapper(session: Session) -> MapperVersion:
+    active_mapper = get_settings().active_survey_mapper
     mapper = session.scalar(
         select(MapperVersion).where(
-            MapperVersion.version == "survey_mapper_v1",
+            MapperVersion.version == active_mapper,
             MapperVersion.status == "active",
         ),
     )
     if mapper is None:
-        raise ValueError("active survey_mapper_v1 mapper version is missing")
+        raise ValueError(f"active {active_mapper} mapper version is missing")
     return mapper
+
+
+def canonicalize_survey_category(category: str) -> str:
+    return SURVEY_CATEGORY_ALIASES.get(category, category)
+
+
+def canonicalize_survey_categories(value: object) -> list[str]:
+    categories: list[str] = []
+    seen: set[str] = set()
+    for raw_category in _string_list(value):
+        category = canonicalize_survey_category(raw_category)
+        if category not in seen:
+            categories.append(category)
+            seen.add(category)
+    return categories
+
+
+def canonicalize_survey_budget_range(value: object) -> str | None:
+    raw = _optional_string(value)
+    if raw is None:
+        return None
+    return SURVEY_BUDGET_ALIASES.get(raw, raw)
+
+
+def _canonical_category_traits(value: object) -> dict[str, list[str]]:
+    if not isinstance(value, dict):
+        return {}
+    traits: dict[str, list[str]] = {}
+    for raw_category, raw_values in value.items():
+        if not isinstance(raw_category, str) or not raw_category:
+            continue
+        parsed_values = _string_list(raw_values)
+        if not parsed_values:
+            continue
+        category = canonicalize_survey_category(raw_category)
+        category_values = traits.setdefault(category, [])
+        for trait in parsed_values:
+            if trait not in category_values:
+                category_values.append(trait)
+    return traits
 
 
 def _active_vector_schema(session: Session) -> VectorSchemaVersion:

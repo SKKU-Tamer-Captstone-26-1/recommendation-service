@@ -53,6 +53,24 @@ resolve_job() {
       JOB_NAME="${RECOMMENDATION_JOB_NAME:-recommendation-beverage-smoke-staging}"
       JOB_ARGS=(-m app.tools.beverage_recommendation_smoke)
       ;;
+    survey-adapter-user)
+      [[ -n "${RECOMMENDATION_SURVEY_ADAPTER_EXTERNAL_USER_ID:-}" ]] \
+        || fail "RECOMMENDATION_SURVEY_ADAPTER_EXTERNAL_USER_ID is required"
+      JOB_NAME="${RECOMMENDATION_JOB_NAME:-recommendation-survey-adapter-user-staging}"
+      JOB_ARGS=(
+        -m app.tools.survey_result_adapter
+        --external-user-id "$RECOMMENDATION_SURVEY_ADAPTER_EXTERNAL_USER_ID"
+      )
+      ;;
+    survey-adapter-response)
+      [[ -n "${RECOMMENDATION_SURVEY_ADAPTER_RESPONSE_ID:-}" ]] \
+        || fail "RECOMMENDATION_SURVEY_ADAPTER_RESPONSE_ID is required"
+      JOB_NAME="${RECOMMENDATION_JOB_NAME:-recommendation-survey-adapter-response-staging}"
+      JOB_ARGS=(
+        -m app.tools.survey_result_adapter
+        --survey-response-id "$RECOMMENDATION_SURVEY_ADAPTER_RESPONSE_ID"
+      )
+      ;;
     *)
       fail "unsupported RECOMMENDATION_JOB_MODE: ${mode}"
       ;;
@@ -74,6 +92,9 @@ SERVICE_ACCOUNT="${RECOMMENDATION_RUNTIME_SERVICE_ACCOUNT:-recommendation-servic
 TASK_TIMEOUT="${RECOMMENDATION_JOB_TASK_TIMEOUT:-1800s}"
 MEMORY="${RECOMMENDATION_JOB_MEMORY:-1Gi}"
 CPU="${RECOMMENDATION_JOB_CPU:-1}"
+SURVEY_SERVICE_GRPC_ADDR="${SURVEY_SERVICE_GRPC_ADDR:-survey-service-vcuepibcwq-du.a.run.app:443}"
+SURVEY_SERVICE_GRPC_AUTH_BEARER_TOKEN_SECRET="${SURVEY_SERVICE_GRPC_AUTH_BEARER_TOKEN_SECRET:-}"
+SURVEY_ADAPTER_DRY_RUN="${RECOMMENDATION_SURVEY_ADAPTER_DRY_RUN:-0}"
 
 [[ -n "$PROJECT" ]] || fail "GCP_PROJECT is required or gcloud project must be set"
 [[ -n "$MODE" ]] || fail "RECOMMENDATION_JOB_MODE is required"
@@ -100,11 +121,26 @@ env_vars=(
   "APP_ENV=staging"
   "QDRANT_INDEXING_ENABLED=true"
 )
+if [[ "$MODE" == survey-adapter-* ]]; then
+  env_vars+=("SURVEY_SERVICE_GRPC_ADDR=${SURVEY_SERVICE_GRPC_ADDR}")
+  if [[ "$SURVEY_ADAPTER_DRY_RUN" == "1" ]]; then
+    JOB_ARGS+=(--dry-run)
+  fi
+fi
 secret_envs=(
   "DATABASE_URL=${DATABASE_SECRET}:latest"
   "QDRANT_URL=${QDRANT_URL_SECRET}:latest"
   "QDRANT_API_KEY=${QDRANT_API_KEY_SECRET}:latest"
 )
+if [[ -n "$SURVEY_SERVICE_GRPC_AUTH_BEARER_TOKEN_SECRET" ]]; then
+  [[ "$SURVEY_SERVICE_GRPC_AUTH_BEARER_TOKEN_SECRET" == *recommendation* \
+    || "$SURVEY_SERVICE_GRPC_AUTH_BEARER_TOKEN_SECRET" == *rec* ]] \
+    || fail "survey auth token secret must clearly belong to recommendation-service"
+  require_secret "$PROJECT" "$SURVEY_SERVICE_GRPC_AUTH_BEARER_TOKEN_SECRET"
+  secret_envs+=(
+    "SURVEY_SERVICE_GRPC_AUTH_BEARER_TOKEN=${SURVEY_SERVICE_GRPC_AUTH_BEARER_TOKEN_SECRET}:latest"
+  )
+fi
 
 echo "deploying staging job mode=${MODE} job=${JOB_NAME}"
 echo "project=${PROJECT} region=${REGION}"

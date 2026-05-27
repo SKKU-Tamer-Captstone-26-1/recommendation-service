@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from app.domain.foundation_versions import scoring_v1_payloads
+from app.domain.foundation_versions import SURVEY_MAPPER_V1_1, scoring_v1_payloads
 from app.models.enums import ProfileStatus
 from app.models.profile import TasteProfileRevision
 from app.models.versioning import ScoringConfig
@@ -100,9 +100,7 @@ class DrinkEvaluationReport:
             "scoring_config_version": self.scoring_config_version,
             "vector_schema_version": self.vector_schema_version,
             "metrics": self.metrics,
-            "fixture_results": [
-                result.to_dict() for result in self.fixture_results
-            ],
+            "fixture_results": [result.to_dict() for result in self.fixture_results],
         }
 
 
@@ -233,9 +231,7 @@ def _evaluate_fixture(
     ]
     expected_reasons = set(fixture.expected_reason_codes)
     actual_reasons = {
-        reason_code
-        for result in top_results
-        for reason_code in result.reason_codes
+        reason_code for result in top_results for reason_code in result.reason_codes
     }
     final_scores_by_key = {
         _catalog_key(candidate): score.final_score for candidate, score in scored
@@ -280,7 +276,7 @@ def _profile_from_fixture(
         survey_response_id=f"eval_{fixture.fixture_id}",
         survey_version="evaluation_v1",
         survey_response_revision=1,
-        mapper_version_id=uuid.uuid5(EVALUATION_NAMESPACE, "survey_mapper_v1"),
+        mapper_version_id=uuid.uuid5(EVALUATION_NAMESPACE, SURVEY_MAPPER_V1_1),
         vector_schema_version_id=vector_schema_version_id,
         taste_vector=generated.taste_vector,
         taste_vector_json=generated.taste_vector_json,
@@ -320,9 +316,7 @@ def _aggregate_metrics(
         "average_reason_code_coverage": _average(
             result.reason_code_coverage for result in fixture_results
         ),
-        "fixtures_with_positive_score_above_negative": (
-            positive_above_negative_count
-        ),
+        "fixtures_with_positive_score_above_negative": (positive_above_negative_count),
         "positive_score_above_negative_rate": _ratio(
             positive_above_negative_count,
             len(fixture_results),

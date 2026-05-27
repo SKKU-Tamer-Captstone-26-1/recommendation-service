@@ -17,6 +17,9 @@ from app.models.sync import DeadLetterEvent, SurveySyncCursor, SurveySyncEvent
 from app.services.profile_generation import (
     ProfileGenerationService,
     SurveyProfileInput,
+    canonicalize_survey_budget_range,
+    canonicalize_survey_categories,
+    canonicalize_survey_category,
 )
 
 PROFILE_EVENT_TYPES = frozenset(
@@ -533,10 +536,10 @@ def survey_result_to_response(result: survey_pb2.SurveyResult) -> SurveyResponse
     )
     answers = {
         "experience_level": result.level or None,
-        "categories": list(result.categories),
+        "categories": canonicalize_survey_categories(list(result.categories)),
         "category_traits": _category_traits_from_survey_result(result),
         "global_keywords": list(result.flavor_keywords),
-        "budget_range": result.budget or None,
+        "budget_range": canonicalize_survey_budget_range(result.budget),
         "source_contract": "ontheblock.survey.v1.SurveyResult",
     }
     payload = {
@@ -570,7 +573,7 @@ def _category_traits_from_survey_result(
     ):
         parsed = [value for value in values if value]
         if parsed:
-            traits[category] = parsed
+            traits[canonicalize_survey_category(category)] = parsed
     return traits
 
 

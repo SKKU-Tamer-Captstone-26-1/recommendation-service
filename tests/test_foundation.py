@@ -4,9 +4,9 @@ from app.core.config import Settings
 from app.db.base import Base
 from app.domain.foundation_versions import (
     SCORING_V1,
-    SURVEY_MAPPER_V1,
+    SURVEY_MAPPER_V1_1,
     scoring_v1_payloads,
-    survey_mapper_v1_payload,
+    survey_mapper_v1_1_payload,
     taste_v1_vector_schema_payload,
 )
 from app.domain.vector_schema import TASTE_V1_DIMENSION_COUNT, TASTE_V1_DIMENSIONS
@@ -34,7 +34,7 @@ def test_service_status_exposes_active_foundation_versions() -> None:
     payload = response.json()
     assert payload["service"] == "recommendation-service"
     assert payload["active_vector_schema"] == "taste_v1"
-    assert payload["active_survey_mapper"] == "survey_mapper_v1"
+    assert payload["active_survey_mapper"] == "survey_mapper_v1_1"
     assert payload["active_scoring_config"] == "scoring_v1"
 
 
@@ -78,13 +78,13 @@ def test_taste_v1_dimension_order_is_stable() -> None:
 
 def test_foundation_version_payloads_match_active_settings() -> None:
     vector_payload = taste_v1_vector_schema_payload()
-    mapper_payload = survey_mapper_v1_payload()
+    mapper_payload = survey_mapper_v1_1_payload()
     scoring_payloads = scoring_v1_payloads()
 
     assert vector_payload["version"] == "taste_v1"
     assert vector_payload["dimension_count"] == 16
     assert vector_payload["status"] == "active"
-    assert mapper_payload["version"] == SURVEY_MAPPER_V1
+    assert mapper_payload["version"] == SURVEY_MAPPER_V1_1
     assert mapper_payload["compatible_vector_schema"] == "taste_v1"
     assert {payload["target_type"] for payload in scoring_payloads} == {
         "beverage",
