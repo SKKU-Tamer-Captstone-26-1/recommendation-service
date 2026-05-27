@@ -101,6 +101,54 @@ Create a separate migration owner and runtime app user before public launch.
 The runtime app user should not keep extension-creation privileges.
 ```
 
+## Provision Staging Qdrant
+
+Preferred production direction is Qdrant Cloud in the same region. For this
+staging plan, a temporary Cloud Run Qdrant service is acceptable because Qdrant
+is rebuildable from recommendation PostgreSQL.
+
+Dry-run inspection:
+
+```bash
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-provision-staging-qdrant.sh
+```
+
+Apply:
+
+```bash
+RECOMMENDATION_QDRANT_PROVISION_APPLY=1 \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-provision-staging-qdrant.sh
+```
+
+The script creates or confirms:
+
+```text
+service = recommendation-qdrant-staging
+image = docker.io/qdrant/qdrant:v1.12.4
+api_key_secret = recommendation-qdrant-api-key-staging
+url_secret = recommendation-qdrant-url-staging
+service_account = recommendation-qdrant-staging
+storage_policy = ephemeral_rebuild_from_postgresql
+```
+
+The Cloud Run Qdrant service is public at the Cloud Run ingress layer but
+protected by Qdrant's API key. Qdrant documents
+`QDRANT__SERVICE__API_KEY` as the environment variable for API key
+configuration and recommends TLS when API keys are used:
+
+```text
+https://qdrant.tech/documentation/guides/security/
+```
+
+Rollback:
+
+```text
+Delete the staging Qdrant service and secrets only after PostgreSQL has the
+canonical vectors. Rebuild Qdrant from PostgreSQL after recreation.
+```
+
 ## Deploy gRPC Service
 
 Preflight without deploying:

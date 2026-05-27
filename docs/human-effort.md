@@ -153,6 +153,8 @@ Current repo evidence:
   `scripts/deploy/gcp-cloud-run-grpc.sh`.
 - Staging Cloud SQL provisioning script exists at
   `scripts/deploy/gcp-provision-staging-sql.sh`.
+- Staging Qdrant provisioning script exists at
+  `scripts/deploy/gcp-provision-staging-qdrant.sh`.
 - GCP deployment runbook exists at `docs/operations/gcp-deployment.md`.
 - The deploy script refuses obvious shared-service database secrets.
 - GCP inspection on 2026-05-27 found only these Secret Manager secrets:
@@ -175,11 +177,21 @@ Current repo evidence:
   `recommendation-db-dsn-staging`.
 - Post-create dry-run on 2026-05-27 reports the recommendation Cloud SQL
   instance, database, user, and secret all exist.
+- Qdrant provisioning dry-run on 2026-05-27 reports missing service account,
+  API key secret, Cloud Run service, and URL secret for staging Qdrant.
+- Apply mode on 2026-05-27 created Cloud Run service
+  `recommendation-qdrant-staging`, service account
+  `recommendation-qdrant-staging`, and secrets
+  `recommendation-qdrant-url-staging` and
+  `recommendation-qdrant-api-key-staging`.
+- Post-create dry-run on 2026-05-27 reports the Qdrant service account, API key
+  secret, Cloud Run service, and URL secret all exist.
+- Staging Qdrant HTTPS/API-key smoke passes with the application
+  `qdrant-client` factory after the factory was fixed to stop forcing default
+  port `6333` for full HTTPS URLs.
 
 Human-provided inputs needed:
 
-- recommendation-owned Qdrant endpoint
-- Qdrant URL/API key secrets where required
 - Cloud Run runtime service account decision
 - Cloud Run ingress decision: private behind gateway or reviewed public staging
   smoke path

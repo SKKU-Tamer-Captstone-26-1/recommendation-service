@@ -6,7 +6,11 @@ import pytest
 from qdrant_client import QdrantClient
 
 from app.core.config import Settings
-from app.infrastructure.qdrant.client import QdrantVectorClient, QdrantVectorPoint
+from app.infrastructure.qdrant import client as qdrant_client_module
+from app.infrastructure.qdrant.client import (
+    QdrantVectorClient,
+    QdrantVectorPoint,
+)
 from app.models.enums import QdrantIndexStatus, VectorOwnerType
 from app.models.vector import QdrantPoint, RecommendationVector
 from app.models.versioning import VectorSchemaVersion
@@ -215,6 +219,28 @@ def test_qdrant_vector_client_indexes_and_queries_in_memory() -> None:
     assert results[0].point_id == "11111111-1111-4111-8111-111111111111"
     assert results[0].payload["owner_type"] == "beverage_item"
     assert results[0].score > 0.99
+
+
+def test_create_qdrant_client_does_not_force_default_port(monkeypatch) -> None:
+    captured_kwargs: dict[str, Any] = {}
+
+    class FakeQdrantClient:
+        def __init__(self, **kwargs) -> None:
+            captured_kwargs.update(kwargs)
+
+    monkeypatch.setattr(qdrant_client_module, "QdrantClient", FakeQdrantClient)
+
+    qdrant_client_module.create_qdrant_client(
+        Settings(
+            qdrant_url="https://recommendation-qdrant-staging.example.run.app",
+            qdrant_api_key="secret",
+        ),
+    )
+
+    assert captured_kwargs["url"] == (
+        "https://recommendation-qdrant-staging.example.run.app"
+    )
+    assert captured_kwargs["port"] is None
 
 
 class _FakeVectorRepository:

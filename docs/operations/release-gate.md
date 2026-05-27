@@ -166,6 +166,17 @@ bash scripts/deploy/gcp-provision-staging-sql.sh
 Only run it with `RECOMMENDATION_PROVISION_APPLY=1` when creating billable
 staging resources is approved.
 
+Inspect the staging Qdrant plan:
+
+```bash
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-provision-staging-qdrant.sh
+```
+
+Only run it with `RECOMMENDATION_QDRANT_PROVISION_APPLY=1` when creating a
+temporary public Cloud Run Qdrant staging service protected by Qdrant API key is
+approved.
+
 ## Operations Metrics Endpoint
 
 The HTTP API exposes:

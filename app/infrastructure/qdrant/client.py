@@ -143,6 +143,7 @@ def create_qdrant_client(settings: Settings | None = None) -> QdrantClient:
     resolved_settings = settings or get_settings()
     return QdrantClient(
         url=resolved_settings.qdrant_url,
+        port=None,
         api_key=resolved_settings.qdrant_api_key or None,
         timeout=resolved_settings.qdrant_timeout_seconds,
     )

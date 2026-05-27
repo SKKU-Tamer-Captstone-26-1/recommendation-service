@@ -100,6 +100,36 @@ Alembic foundation migration creates `pgcrypto`, `postgis`, and `pg_trgm`.
 Before production, split migration and runtime users so the Cloud Run serving
 user does not need extension-creation privileges.
 
+## Staging Qdrant Provisioning
+
+Dry-run inspection:
+
+```bash
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-provision-staging-qdrant.sh
+```
+
+Create or update the staging Qdrant Cloud Run service:
+
+```bash
+RECOMMENDATION_QDRANT_PROVISION_APPLY=1 \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-provision-staging-qdrant.sh
+```
+
+Defaults:
+
+```text
+service = recommendation-qdrant-staging
+image = docker.io/qdrant/qdrant:v1.12.4
+api_key_secret = recommendation-qdrant-api-key-staging
+url_secret = recommendation-qdrant-url-staging
+service_account = recommendation-qdrant-staging
+```
+
+This is a staging-only, ephemeral Qdrant service. Qdrant remains rebuildable
+from recommendation PostgreSQL and must not be treated as canonical storage.
+
 ## Verification
 
 After deployment, run:
