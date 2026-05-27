@@ -226,7 +226,7 @@ Persist:
 - score breakdowns
 - explanation payloads
 - map/place snapshot revisions for venue results
-- user interactions such as click, save, dismiss, and detail view
+- user interactions such as impression, click, save, dismiss, and detail view
 
 Recommendation logs are product analytics and debugging data. They are not raw
 survey truth.

@@ -291,7 +291,16 @@ Request:
   "request_id": "rec_req_123",
   "result_id": "rec_result_456",
   "event_type": "RECOMMENDATION_EVENT_TYPE_CLICK",
-  "metadata": {}
+  "idempotency_key": "event_rec_req_123_rec_result_456_click_1",
+  "metadata": {
+    "client_platform": "flutter",
+    "app_version": "1.0.0",
+    "surface": "home_recommendation_card",
+    "session_id_hash": "sha256:...",
+    "list_position": 1,
+    "visible_ms": 2300,
+    "source": "client"
+  }
 }
 ```
 
@@ -304,6 +313,29 @@ RECOMMENDATION_EVENT_TYPE_SAVE
 RECOMMENDATION_EVENT_TYPE_DISMISS
 RECOMMENDATION_EVENT_TYPE_DETAIL_VIEW
 ```
+
+`request_id` and `result_id` must reference recommendation-owned request/result
+records returned by recommendation APIs.
+
+Client-generated feedback in staging and production MUST include
+`idempotency_key`. The key should be stable for one logical event retry and
+unique across different events. The service deduplicates by idempotency key.
+
+Allowed metadata keys:
+
+| Key | Type | Meaning |
+|---|---|---|
+| `client_platform` | string | Client platform, for example `flutter`, `ios`, `android`, or `web` |
+| `app_version` | string | Client application version |
+| `surface` | string | Product surface where the recommendation appeared |
+| `session_id_hash` | string | Hashed session identifier, never a raw session token |
+| `list_position` | integer | Position shown to the user |
+| `visible_ms` | integer | Approximate visible duration in milliseconds |
+| `source` | string | Event source, for example `client`, `chat`, `load_test`, or `system` |
+
+Metadata MUST NOT include raw PII, tokens, auth headers, raw user IDs, raw
+session IDs, names, email addresses, or phone numbers. Unsupported metadata keys
+are rejected instead of silently stored.
 
 ## Internal RPCs
 
@@ -345,6 +377,9 @@ Required profile-state errors:
 
 ## Idempotency
 
-Interaction events SHOULD accept an idempotency key when clients can retry.
+Client-generated interaction events in staging and production MUST include an
+idempotency key when clients can retry. Local tools and tests should include one
+unless they are explicitly testing missing-key behavior.
+
 Internal profile regeneration MUST be idempotent by profile generation uniqueness
 rules documented in `../recommendation/sync-flow.md`.

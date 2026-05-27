@@ -45,6 +45,44 @@ FRESH_INVENTORY_DAYS = 3
 STALE_INVENTORY_DAYS = 7
 EXCLUDE_INVENTORY_DAYS = 30
 EXCLUDE_PRICE_EXPIRED_DAYS = 30
+INTERACTION_EVENT_TYPES = frozenset(event.value for event in InteractionEventType)
+ALLOWED_INTERACTION_METADATA_KEYS = frozenset(
+    {
+        "client_platform",
+        "app_version",
+        "surface",
+        "session_id_hash",
+        "list_position",
+        "visible_ms",
+        "source",
+    },
+)
+INTERACTION_METADATA_STRING_KEYS = frozenset(
+    {
+        "client_platform",
+        "app_version",
+        "surface",
+        "session_id_hash",
+        "source",
+    },
+)
+INTERACTION_METADATA_INTEGER_KEYS = frozenset({"list_position", "visible_ms"})
+PII_LIKE_INTERACTION_METADATA_TOKENS = frozenset(
+    {
+        "auth",
+        "authorization",
+        "birthday",
+        "email",
+        "external_user_id",
+        "jwt",
+        "name",
+        "phone",
+        "token",
+        "user_id",
+    },
+)
+MAX_INTERACTION_METADATA_STRING_LENGTH = 256
+MAX_INTERACTION_METADATA_INTEGER = 86_400_000
 
 logger = logging.getLogger(__name__)
 
@@ -518,12 +556,15 @@ class BeverageRecommendationService:
         idempotency_key: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> InteractionRecordResult:
-        if event_type not in {event.value for event in InteractionEventType}:
+        if event_type not in INTERACTION_EVENT_TYPES:
             raise ValueError(f"unsupported recommendation event type: {event_type}")
-        if idempotency_key:
+        resolved_idempotency_key = _normalize_idempotency_key(idempotency_key)
+        sanitized_metadata = validate_interaction_metadata(metadata)
+        if resolved_idempotency_key:
             existing = self._session.scalar(
                 select(RecommendationInteraction).where(
-                    RecommendationInteraction.idempotency_key == idempotency_key,
+                    RecommendationInteraction.idempotency_key
+                    == resolved_idempotency_key,
                 ),
             )
             if existing is not None:
@@ -532,12 +573,84 @@ class BeverageRecommendationService:
             request_id=request_id,
             result_id=result_id,
             event_type=event_type,
-            idempotency_key=idempotency_key,
-            metadata_json=metadata or {},
+            idempotency_key=resolved_idempotency_key,
+            metadata_json=sanitized_metadata,
         )
         self._session.add(interaction)
         self._session.flush()
         return InteractionRecordResult(interaction.id, duplicate=False)
+
+
+def validate_interaction_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
+    """Return feedback metadata after enforcing the public allowlist."""
+
+    if metadata is None:
+        return {}
+    if not isinstance(metadata, dict):
+        raise ValueError("metadata must be an object")
+
+    sanitized: dict[str, Any] = {}
+    for raw_key, value in metadata.items():
+        key = str(raw_key)
+        normalized_key = key.lower().replace("-", "_")
+        if _is_pii_like_metadata_key(normalized_key):
+            raise ValueError(f"unsafe recommendation event metadata key: {key}")
+        if key not in ALLOWED_INTERACTION_METADATA_KEYS:
+            raise ValueError(f"unsupported recommendation event metadata key: {key}")
+        if value is None:
+            continue
+        if key in INTERACTION_METADATA_STRING_KEYS:
+            sanitized[key] = _metadata_string(key, value)
+            continue
+        if key in INTERACTION_METADATA_INTEGER_KEYS:
+            sanitized[key] = _metadata_integer(key, value)
+            continue
+        raise ValueError(f"unsupported recommendation event metadata key: {key}")
+    return sanitized
+
+
+def _normalize_idempotency_key(value: str | None) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("idempotency_key must be a string")
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError("idempotency_key must not be blank")
+    if len(normalized) > 128:
+        raise ValueError("idempotency_key must be at most 128 characters")
+    return normalized
+
+
+def _is_pii_like_metadata_key(key: str) -> bool:
+    return any(token in key for token in PII_LIKE_INTERACTION_METADATA_TOKENS)
+
+
+def _metadata_string(key: str, value: Any) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"metadata.{key} must be a string")
+    if len(value) > MAX_INTERACTION_METADATA_STRING_LENGTH:
+        raise ValueError(
+            f"metadata.{key} must be at most "
+            f"{MAX_INTERACTION_METADATA_STRING_LENGTH} characters",
+        )
+    return value
+
+
+def _metadata_integer(key: str, value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"metadata.{key} must be an integer")
+    if isinstance(value, float) and not value.is_integer():
+        raise ValueError(f"metadata.{key} must be an integer")
+    normalized = int(value)
+    if normalized < 0:
+        raise ValueError(f"metadata.{key} must be greater than or equal to zero")
+    if normalized > MAX_INTERACTION_METADATA_INTEGER:
+        raise ValueError(
+            f"metadata.{key} must be less than or equal to "
+            f"{MAX_INTERACTION_METADATA_INTEGER}",
+        )
+    return normalized
 
 
 def score_beverage_candidate(

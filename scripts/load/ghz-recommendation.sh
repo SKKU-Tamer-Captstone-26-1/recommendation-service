@@ -100,7 +100,7 @@ case "$METHOD" in
       exit 2
     fi
     run_ghz "RecordRecommendationEvent" \
-      "{\"request_id\":\"$RECOMMENDATION_LOAD_REQUEST_ID\",\"result_id\":\"$RECOMMENDATION_LOAD_RESULT_ID\",\"event_type\":\"RECOMMENDATION_EVENT_TYPE_IMPRESSION\",\"idempotency_key\":\"load-${PROFILE}-${RANDOM}\",\"metadata\":{\"fields\":{\"load_profile\":{\"string_value\":\"$PROFILE\"}}}}"
+      "{\"request_id\":\"$RECOMMENDATION_LOAD_REQUEST_ID\",\"result_id\":\"$RECOMMENDATION_LOAD_RESULT_ID\",\"event_type\":\"RECOMMENDATION_EVENT_TYPE_IMPRESSION\",\"idempotency_key\":\"load-${PROFILE}-${RANDOM}\",\"metadata\":{\"client_platform\":\"ghz\",\"surface\":\"load_test\",\"source\":\"recommendation_load_harness\"}}"
     ;;
   mixed)
     echo "mixed profile runs profile then beverage. Venue and interaction require explicit IDs."

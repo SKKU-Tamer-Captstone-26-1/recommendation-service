@@ -78,6 +78,29 @@ negative = dismiss
 
 These are weak product labels until enough real traffic exists.
 
+`impression` is required for reliable rate metrics such as CTR:
+
+```text
+ctr = click / impression
+```
+
+Feedback event metadata is not a label. Client-generated feedback metadata is
+restricted to:
+
+```text
+client_platform
+app_version
+surface
+session_id_hash
+list_position
+visible_ms
+source
+```
+
+The service rejects unsupported or PII-like metadata keys before storing
+`recommendation_interactions`. Training exports must continue to derive labels
+from recommendation-owned interaction rows only.
+
 ## Acceptance Criteria
 
 ```text

@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.models.enums import InteractionEventType
 from app.models.profile import TasteProfileRevision
 from app.models.recommendation_event import (
     RecommendationExplanation,
@@ -20,6 +21,7 @@ from app.models.recommendation_event import (
 
 FEATURE_SCHEMA_VERSION = "recommendation_training_features_v1"
 LABEL_SCHEMA_VERSION = "recommendation_interaction_labels_v1"
+LABEL_EVENT_TYPES = tuple(event.value for event in InteractionEventType)
 
 
 @dataclass(frozen=True)
@@ -254,13 +256,7 @@ def _profile_features(profile: TasteProfileRevision | None) -> dict[str, Any]:
 def _interaction_labels(
     interactions: tuple[RecommendationInteraction, ...],
 ) -> dict[str, Any]:
-    counts = {
-        "impression": 0,
-        "click": 0,
-        "save": 0,
-        "dismiss": 0,
-        "detail_view": 0,
-    }
+    counts = {event_type: 0 for event_type in LABEL_EVENT_TYPES}
     for interaction in interactions:
         if interaction.event_type in counts:
             counts[interaction.event_type] += 1
