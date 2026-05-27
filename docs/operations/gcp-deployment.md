@@ -368,12 +368,13 @@ python3 -m app.tools.deployed_smoke --mode recommendation
 Current deployed evidence:
 
 ```text
-revision = recommendation-service-00002-v8w
+revision = recommendation-service-00003-b2d
 traffic = 100%
 grpc_host = recommendation-service-vcuepibcwq-du.a.run.app:443
 grpc_health = SERVING
 health_only_deployed_smoke = pass
 GetProfileStatus without bearer token = UNAUTHENTICATED
+GetProfileStatus with invalid bearer token = UNAUTHENTICATED TOKEN_INVALID
 latest_migration = 0004_survey_mapper_v1_1
 auth_validation_mode = grpc ValidateToken
 auth_grpc_public_keys_smoke = pass

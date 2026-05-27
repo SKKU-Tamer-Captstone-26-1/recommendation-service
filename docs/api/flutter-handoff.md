@@ -43,9 +43,10 @@ an auth owner.
 Current deployed smoke evidence:
 
 ```text
-cloud_run_revision = recommendation-service-00002-v8w
+cloud_run_revision = recommendation-service-00003-b2d
 grpc_health = SERVING
 GetProfileStatus without bearer token = UNAUTHENTICATED
+GetProfileStatus with invalid bearer token = UNAUTHENTICATED TOKEN_INVALID
 ```
 
 ## Proto

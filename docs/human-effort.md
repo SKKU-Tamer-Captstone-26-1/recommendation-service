@@ -230,12 +230,15 @@ Current repo evidence:
   for `app.tools.survey_result_adapter`.
 - Cloud Run service `recommendation-service` deployed on 2026-05-27 at
   `recommendation-service-vcuepibcwq-du.a.run.app:443`.
-- Current serving revision is `recommendation-service-00002-v8w` at 100%
-  traffic after applying mapper migration `0004_survey_mapper_v1_1`.
+- Current serving revision is `recommendation-service-00003-b2d` at 100%
+  traffic after applying mapper migration `0004_survey_mapper_v1_1` and
+  enabling auth-service gRPC `ValidateToken`.
 - Deployed gRPC health returns `SERVING`.
 - Health-only deployed recommendation smoke passes with
   `RECOMMENDATION_SMOKE_HEALTH_ONLY=true`.
 - `GetProfileStatus` without bearer metadata returns `UNAUTHENTICATED`.
+- `GetProfileStatus` with an invalid bearer token returns `UNAUTHENTICATED`
+  with auth-service reason `TOKEN_INVALID`.
 - Flutter handoff is documented in `docs/api/flutter-handoff.md`.
 
 Human-provided inputs needed:
