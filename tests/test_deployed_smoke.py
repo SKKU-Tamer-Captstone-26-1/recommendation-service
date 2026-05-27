@@ -1,6 +1,6 @@
 from grpc_health.v1 import health_pb2
 
-from app.grpc.gen import auth_pb2, recommendation_pb2
+from app.grpc.gen import auth_pb2, recommendation_pb2, survey_pb2
 from app.services import deployed_smoke
 from app.services.deployed_smoke import SmokeResult, run_deployed_smokes
 
@@ -131,6 +131,70 @@ def test_survey_smoke_can_verify_grpc_health(monkeypatch) -> None:
     assert captured["service"] == "ontheblock.survey.v1.SurveyService"
     assert captured["timeout"] == 3.0
     assert captured["metadata"] == (("authorization", "Bearer token"),)
+
+
+def test_survey_smoke_can_verify_grpc_result_contract(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeChannel:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    class FakeHealthStub:
+        def __init__(self, channel) -> None:
+            captured["health_channel"] = channel
+
+        def Check(self, request, *, timeout, metadata):
+            return health_pb2.HealthCheckResponse(
+                status=health_pb2.HealthCheckResponse.SERVING,
+            )
+
+    class FakeSurveyStub:
+        def __init__(self, channel) -> None:
+            captured["survey_channel"] = channel
+
+        def GetSurveyResultByUser(self, request, *, timeout, metadata):
+            captured["user_id"] = request.user_id
+            result = survey_pb2.SurveyResult(
+                survey_id="survey_123",
+                user_id=request.user_id,
+                level="expert",
+                categories=["whiskey", "cognac"],
+                whiskey=["bourbon_character"],
+                flavor_keywords=["dried_choco"],
+                budget="over_200k",
+            )
+            return survey_pb2.GetSurveyResultResponse(result=result)
+
+    monkeypatch.setattr(
+        deployed_smoke,
+        "_grpc_channel",
+        lambda addr, env: FakeChannel(),
+    )
+    monkeypatch.setattr(deployed_smoke.health_pb2_grpc, "HealthStub", FakeHealthStub)
+    monkeypatch.setattr(
+        deployed_smoke.survey_pb2_grpc, "SurveyServiceStub", FakeSurveyStub
+    )
+
+    result = deployed_smoke.smoke_survey_service(
+        {
+            "SURVEY_SMOKE_GRPC_ADDR": "survey-service.example:443",
+            "SURVEY_SMOKE_EXTERNAL_USER_ID": "usr_123",
+        },
+    )
+
+    assert result == SmokeResult(
+        name="survey",
+        status="passed",
+        detail=(
+            "grpc_health=SERVING survey_result_contract=verified "
+            "survey_id=survey_123 categories=2"
+        ),
+    )
+    assert captured["user_id"] == "usr_123"
 
 
 def test_recommendation_smoke_can_verify_grpc_health_only(monkeypatch) -> None:

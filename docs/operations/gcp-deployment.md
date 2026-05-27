@@ -329,6 +329,18 @@ SURVEY_SERVICE_GRPC_AUTH_BEARER_TOKEN_SECRET=recommendation-survey-grpc-token-st
 
 When a safe deployed survey user or survey ID is available:
 
+First validate the deployed survey result contract without writing a profile:
+
+```bash
+SURVEY_SMOKE_GRPC_ADDR=survey-service-vcuepibcwq-du.a.run.app:443 \
+SURVEY_SMOKE_EXTERNAL_USER_ID=<safe-user-id> \
+SMOKE_GRPC_TLS=1 \
+python3 -m app.tools.deployed_smoke --mode survey
+```
+
+Use `SURVEY_SMOKE_RESPONSE_ID=<safe-survey-id>` instead of
+`SURVEY_SMOKE_EXTERNAL_USER_ID` when validating by survey response ID.
+
 ```bash
 SURVEY_SERVICE_GRPC_ADDR=survey-service-vcuepibcwq-du.a.run.app:443 \
 SURVEY_SERVICE_GRPC_AUTH_BEARER_TOKEN=<token-if-required> \

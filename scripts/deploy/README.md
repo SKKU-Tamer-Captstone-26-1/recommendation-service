@@ -221,6 +221,19 @@ SURVEY_SERVICE_GRPC_AUTH_BEARER_TOKEN_SECRET=recommendation-survey-grpc-token-st
 The adapter uses `survey_mapper_v1_1` and normalizes deployed category-key
 answers, including `cognac -> brandy_cognac` and `*_k` budget labels.
 
+Before writing a profile, validate the deployed result contract without DB
+writes:
+
+```bash
+SURVEY_SMOKE_GRPC_ADDR=survey-service-vcuepibcwq-du.a.run.app:443 \
+SURVEY_SMOKE_EXTERNAL_USER_ID=<safe-user-id> \
+SMOKE_GRPC_TLS=1 \
+python3 -m app.tools.deployed_smoke --mode survey
+```
+
+Use `SURVEY_SMOKE_RESPONSE_ID=<safe-survey-id>` instead of
+`SURVEY_SMOKE_EXTERNAL_USER_ID` when validating by survey response ID.
+
 ## Verification
 
 After deployment, run:

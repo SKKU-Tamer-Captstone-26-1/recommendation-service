@@ -111,6 +111,8 @@ Useful environment variables:
 AUTH_SMOKE_JWKS_URL
 SURVEY_SMOKE_BASE_URL
 SURVEY_SMOKE_GRPC_ADDR
+SURVEY_SMOKE_EXTERNAL_USER_ID
+SURVEY_SMOKE_RESPONSE_ID
 MAP_SMOKE_BASE_URL
 RECOMMENDATION_SMOKE_GRPC_ADDR
 RECOMMENDATION_SMOKE_HEALTH_ONLY
@@ -125,6 +127,11 @@ health. This confirms deployed protocol reachability only; it is not evidence
 that the recommendation survey sync contract is deployed. Full survey sync
 evidence still requires the event/response contract in
 `docs/recommendation/sync-flow.md`.
+
+If one of `SURVEY_SMOKE_EXTERNAL_USER_ID` or `SURVEY_SMOKE_RESPONSE_ID` is also
+set, the survey gRPC smoke calls `GetSurveyResultByUser` or `GetSurveyResult`
+and validates the returned `SurveyResult` through the recommendation mapper
+adapter without writing a profile.
 
 If `RECOMMENDATION_SMOKE_HEALTH_ONLY=true` is set, the recommendation deployed
 smoke checks gRPC health without requiring a user JWT. This confirms Cloud Run

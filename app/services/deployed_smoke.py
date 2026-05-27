@@ -16,7 +16,10 @@ from app.grpc.gen import (
     auth_pb2_grpc,
     recommendation_pb2,
     recommendation_pb2_grpc,
+    survey_pb2,
+    survey_pb2_grpc,
 )
+from app.services.survey_sync import survey_result_to_response
 
 
 class SmokeSkipped(RuntimeError):
@@ -155,20 +158,71 @@ def _smoke_survey_grpc(env: Env, grpc_addr: str) -> SmokeResult:
     token = env.get("SMOKE_AUTH_BEARER_TOKEN")
     metadata = (("authorization", f"Bearer {token}"),) if token else ()
     with _grpc_channel(grpc_addr, env) as channel:
-        stub = health_pb2_grpc.HealthStub(channel)
-        response = stub.Check(
+        health_stub = health_pb2_grpc.HealthStub(channel)
+        response = health_stub.Check(
             health_pb2.HealthCheckRequest(
                 service=env.get("SURVEY_SMOKE_HEALTH_SERVICE", ""),
             ),
             timeout=timeout,
             metadata=metadata,
         )
-    if response.status != health_pb2.HealthCheckResponse.SERVING:
-        raise RuntimeError(f"survey health status is not SERVING: {response.status}")
+        if response.status != health_pb2.HealthCheckResponse.SERVING:
+            raise RuntimeError(
+                f"survey health status is not SERVING: {response.status}",
+            )
+
+        result_detail = _smoke_survey_result_contract(
+            env,
+            channel,
+            timeout=timeout,
+            metadata=metadata,
+        )
+    detail = "grpc_health=SERVING"
+    if result_detail:
+        detail = f"{detail} {result_detail}"
+    else:
+        detail = f"{detail} sync_contract=not_verified"
     return SmokeResult(
         name="survey",
         status="passed",
-        detail="grpc_health=SERVING sync_contract=not_verified",
+        detail=detail,
+    )
+
+
+def _smoke_survey_result_contract(
+    env: Env,
+    channel: grpc.Channel,
+    *,
+    timeout: float,
+    metadata: tuple[tuple[str, str], ...],
+) -> str | None:
+    external_user_id = env.get("SURVEY_SMOKE_EXTERNAL_USER_ID")
+    survey_response_id = env.get("SURVEY_SMOKE_RESPONSE_ID")
+    if not external_user_id and not survey_response_id:
+        return None
+    if external_user_id and survey_response_id:
+        raise RuntimeError(
+            "set only one of SURVEY_SMOKE_EXTERNAL_USER_ID or SURVEY_SMOKE_RESPONSE_ID",
+        )
+
+    stub = survey_pb2_grpc.SurveyServiceStub(channel)
+    if external_user_id:
+        response = stub.GetSurveyResultByUser(
+            survey_pb2.GetSurveyResultByUserRequest(user_id=external_user_id),
+            timeout=timeout,
+            metadata=metadata,
+        )
+    else:
+        response = stub.GetSurveyResult(
+            survey_pb2.GetSurveyResultRequest(survey_id=survey_response_id),
+            timeout=timeout,
+            metadata=metadata,
+        )
+    mapped = survey_result_to_response(response.result)
+    return (
+        "survey_result_contract=verified "
+        f"survey_id={mapped.survey_response_id} "
+        f"categories={len(mapped.answers.get('categories') or [])}"
     )
 
 
