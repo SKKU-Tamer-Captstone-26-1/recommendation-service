@@ -4,11 +4,13 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
+import grpc
 import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
+from app.grpc.gen import survey_pb2, survey_pb2_grpc
 from app.models.enums import ProfileStatus, SyncEventStatus
 from app.models.profile import UserProfileState
 from app.models.sync import DeadLetterEvent, SurveySyncCursor, SurveySyncEvent
@@ -29,6 +31,7 @@ SUPPORTED_SURVEY_EVENT_TYPES = frozenset(
     },
 )
 SUPPORTED_SURVEY_VERSIONS = frozenset({"survey_v1"})
+DEPLOYED_SURVEY_RESULT_ADAPTER_VERSION = "survey_v1"
 
 
 class SurveySyncRetryableError(RuntimeError):
@@ -159,6 +162,62 @@ class HttpSurveySyncClient:
         )
         response.raise_for_status()
         return parse_survey_response(response.json())
+
+
+class SurveyResultGrpcAdapterClient:
+    """One-shot adapter for the currently deployed survey-service result RPCs.
+
+    This is not a replacement for the cursor-based sync contract. It exists so a
+    safe test user can be bridged while survey-service adds event/response sync
+    RPCs for production.
+    """
+
+    def __init__(
+        self,
+        *,
+        address: str,
+        use_tls: bool | None = None,
+        bearer_token: str | None = None,
+        timeout_seconds: float = 10.0,
+    ) -> None:
+        self._address = address
+        self._use_tls = use_tls if use_tls is not None else address.endswith(":443")
+        self._bearer_token = bearer_token
+        self._timeout_seconds = timeout_seconds
+
+    def get_survey_result_by_user(self, *, external_user_id: str) -> SurveyResponse:
+        if not external_user_id:
+            raise ValueError("external_user_id is required")
+        with self._channel() as channel:
+            stub = survey_pb2_grpc.SurveyServiceStub(channel)
+            response = stub.GetSurveyResultByUser(
+                survey_pb2.GetSurveyResultByUserRequest(user_id=external_user_id),
+                timeout=self._timeout_seconds,
+                metadata=self._metadata(),
+            )
+        return survey_result_to_response(response.result)
+
+    def get_survey_result(self, *, survey_response_id: str) -> SurveyResponse:
+        if not survey_response_id:
+            raise ValueError("survey_response_id is required")
+        with self._channel() as channel:
+            stub = survey_pb2_grpc.SurveyServiceStub(channel)
+            response = stub.GetSurveyResult(
+                survey_pb2.GetSurveyResultRequest(survey_id=survey_response_id),
+                timeout=self._timeout_seconds,
+                metadata=self._metadata(),
+            )
+        return survey_result_to_response(response.result)
+
+    def _channel(self) -> grpc.Channel:
+        if self._use_tls:
+            return grpc.secure_channel(self._address, grpc.ssl_channel_credentials())
+        return grpc.insecure_channel(self._address)
+
+    def _metadata(self) -> tuple[tuple[str, str], ...]:
+        if not self._bearer_token:
+            return ()
+        return (("authorization", f"Bearer {self._bearer_token}"),)
 
 
 class SurveySyncService:
@@ -460,6 +519,59 @@ def parse_survey_response(payload: Any) -> SurveyResponse:
         answers=answers,
         payload=payload,
     )
+
+
+def survey_result_to_response(result: survey_pb2.SurveyResult) -> SurveyResponse:
+    if not result.survey_id:
+        raise ValueError("survey result is missing survey_id")
+    if not result.user_id:
+        raise ValueError("survey result is missing user_id")
+    completed_at = (
+        result.submitted_at.ToDatetime(tzinfo=UTC)
+        if result.HasField("submitted_at")
+        else datetime.now(UTC)
+    )
+    answers = {
+        "experience_level": result.level or None,
+        "categories": list(result.categories),
+        "category_traits": _category_traits_from_survey_result(result),
+        "global_keywords": list(result.flavor_keywords),
+        "budget_range": result.budget or None,
+        "source_contract": "ontheblock.survey.v1.SurveyResult",
+    }
+    payload = {
+        "survey_response_id": result.survey_id,
+        "external_user_id": result.user_id,
+        "survey_version": DEPLOYED_SURVEY_RESULT_ADAPTER_VERSION,
+        "response_revision": 1,
+        "completed_at": completed_at,
+        "answers": answers,
+    }
+    return SurveyResponse(
+        survey_response_id=result.survey_id,
+        external_user_id=result.user_id,
+        survey_version=DEPLOYED_SURVEY_RESULT_ADAPTER_VERSION,
+        response_revision=1,
+        completed_at=completed_at,
+        answers=answers,
+        payload=payload,
+    )
+
+
+def _category_traits_from_survey_result(
+    result: survey_pb2.SurveyResult,
+) -> dict[str, list[str]]:
+    traits: dict[str, list[str]] = {}
+    for category, values in (
+        ("whiskey", result.whiskey),
+        ("wine", result.wine),
+        ("cocktail", result.cocktail),
+        ("beer", result.beer),
+    ):
+        parsed = [value for value in values if value]
+        if parsed:
+            traits[category] = parsed
+    return traits
 
 
 def _validate_response_matches_event(

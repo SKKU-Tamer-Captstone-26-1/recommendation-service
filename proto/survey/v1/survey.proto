@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package ontheblock.survey.v1;
+
+option java_package = "com.ontheblock.survey.v1";
+option java_multiple_files = true;
+option go_package = "github.com/ontheblock/infra/proto/survey/v1;surveyv1";
+
+import "google/protobuf/timestamp.proto";
+
+// Minimal deployed survey-service contract used by recommendation-service for
+// a controlled adapter path. This is not the cursor-based sync contract from
+// docs/recommendation/sync-flow.md.
+service SurveyService {
+  rpc GetSurveyResult(GetSurveyResultRequest) returns (GetSurveyResultResponse);
+  rpc GetSurveyResultByUser(GetSurveyResultByUserRequest)
+      returns (GetSurveyResultResponse);
+}
+
+message GetSurveyResultRequest {
+  string survey_id = 1;
+}
+
+message GetSurveyResultByUserRequest {
+  string user_id = 1;
+}
+
+message GetSurveyResultResponse {
+  SurveyResult result = 1;
+}
+
+message SurveyResult {
+  string survey_id = 1;
+  string user_id = 2;
+  string level = 3;
+  repeated string categories = 4;
+  repeated string whiskey = 5;
+  repeated string wine = 6;
+  repeated string cocktail = 7;
+  repeated string beer = 8;
+  repeated string flavor_keywords = 9;
+  string budget = 10;
+  google.protobuf.Timestamp submitted_at = 11;
+}

@@ -132,6 +132,48 @@ Until the deployed survey-service proto is available in this repository,
 explicitly configured internal service API with the same fields. Do not
 implement sync against survey-service private tables or inferred schemas.
 
+## Deployed Survey Result Adapter
+
+The deployed survey-service observed on 2026-05-27 exposes gRPC service
+`ontheblock.survey.v1.SurveyService` with:
+
+```text
+GetSurveyQuestions
+SubmitSurvey
+GetSurveyResult
+GetSurveyResultByUser
+```
+
+It does not yet expose the cursor-based sync RPCs above. For staging only,
+`recommendation-service` has a controlled adapter for `GetSurveyResult` and
+`GetSurveyResultByUser`:
+
+```bash
+SURVEY_SERVICE_GRPC_ADDR=survey-service-vcuepibcwq-du.a.run.app:443 \
+python3 -m app.tools.survey_result_adapter \
+  --external-user-id <safe-user-id> \
+  --dry-run
+```
+
+The adapter maps `SurveyResult` to the existing `survey_v1` mapper input:
+
+| SurveyResult field | Mapper input |
+|---|---|
+| `survey_id` | `survey_response_id` |
+| `user_id` | `external_user_id` |
+| `level` | `answers.experience_level` |
+| `categories` | `answers.categories` |
+| `whiskey`, `wine`, `cocktail`, `beer` | `answers.category_traits` |
+| `flavor_keywords` | `answers.global_keywords` |
+| `budget` | `answers.budget_range` |
+| `submitted_at` | `completed_at` |
+
+This adapter MUST NOT be treated as production sync. It has no durable cursor,
+event ID stream, response revision, revocation event, or schema-published event.
+Production sync still requires `ListSurveyEvents` and `GetSurveyResponse` or a
+later reviewed replacement contract with equivalent idempotency and replay
+semantics.
+
 ## Event Contract
 
 Minimum survey event:

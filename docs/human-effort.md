@@ -25,14 +25,19 @@ Current repo evidence:
 - gRPC reflection exposes `GetSurveyQuestions`, `SubmitSurvey`,
   `GetSurveyResult`, and `GetSurveyResultByUser`.
 - HTTP survey smoke paths currently return Cloud Run `502 protocol error`.
+- A controlled one-shot adapter exists for `GetSurveyResult` and
+  `GetSurveyResultByUser` to generate a derived profile for a safe test user.
+  This adapter is not production event sync because it has no cursor/event ID
+  stream.
 
 Human-provided inputs needed:
 
-- deployed survey-service recommendation sync contract:
-  `ListSurveyEvents` and `GetSurveyResponse`, or an approved adapter decision
-  for `GetSurveyResult` / `GetSurveyResultByUser`
+- safe deployed survey test user ID or survey ID allowed for adapter smoke
 - auth metadata or internal service credential required for recommendation sync
-- a safe test survey response/event that may be read by recommendation-service
+- deployed survey-service recommendation sync contract:
+  `ListSurveyEvents` and `GetSurveyResponse`
+- a safe test survey event that may be read by recommendation-service after the
+  sync contract exists
 - confirmation that the deployed event/response contract matches
   `docs/recommendation/sync-flow.md`
 

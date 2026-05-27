@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 from sqlalchemy.orm import Session
 
+from app.grpc.gen import survey_pb2
 from app.models.enums import ProfileStatus, SyncEventStatus
 from app.models.profile import UserProfileState
 from app.models.sync import DeadLetterEvent, SurveySyncCursor, SurveySyncEvent
@@ -16,6 +17,7 @@ from app.services.survey_sync import (
     SurveySyncRetryableError,
     SurveySyncService,
     parse_survey_event_page,
+    survey_result_to_response,
 )
 
 
@@ -206,6 +208,40 @@ def test_survey_sync_retry_does_not_advance_cursor() -> None:
     assert sync_event.last_error == "survey-service unavailable"
     assert sync_event.next_retry_at is not None
     assert cursor.cursor_value == "cur_1"
+
+
+def test_survey_result_adapter_maps_deployed_grpc_shape() -> None:
+    submitted_at = datetime(2026, 5, 27, 6, 0, tzinfo=UTC)
+    result = survey_pb2.SurveyResult(
+        survey_id="survey_123",
+        user_id="usr_123",
+        level="beginner",
+        categories=["whiskey", "beer"],
+        whiskey=["vanilla_caramel", "oak_woody"],
+        beer=["citrus_berry"],
+        flavor_keywords=["vanilla_caramel", "citrus_berry"],
+        budget="30000_100000",
+    )
+    result.submitted_at.FromDatetime(submitted_at)
+
+    response = survey_result_to_response(result)
+
+    assert response.survey_response_id == "survey_123"
+    assert response.external_user_id == "usr_123"
+    assert response.survey_version == "survey_v1"
+    assert response.response_revision == 1
+    assert response.completed_at == submitted_at
+    assert response.answers == {
+        "experience_level": "beginner",
+        "categories": ["whiskey", "beer"],
+        "category_traits": {
+            "whiskey": ["vanilla_caramel", "oak_woody"],
+            "beer": ["citrus_berry"],
+        },
+        "global_keywords": ["vanilla_caramel", "citrus_berry"],
+        "budget_range": "30000_100000",
+        "source_contract": "ontheblock.survey.v1.SurveyResult",
+    }
 
 
 def _page_payload(
