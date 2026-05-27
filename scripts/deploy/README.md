@@ -259,6 +259,7 @@ survey user and matching safe auth token:
 ```bash
 PLAN012_SAFE_SURVEY_EXTERNAL_USER_ID=<safe-user-id> \
 SMOKE_AUTH_BEARER_TOKEN=<safe-staging-token-for-same-user> \
+SMOKE_GRPC_TIMEOUT_SECONDS=30 \
 PLAN012_ALLOW_PROFILE_WRITE=1 \
 PLAN012_ALLOW_EVENT_WRITE=1 \
 GCP_PROJECT=on-the-block-2026 \
@@ -268,3 +269,6 @@ bash scripts/deploy/gcp-run-plan-012-acceptance.sh
 Use `PLAN012_SAFE_SURVEY_RESPONSE_ID=<safe-survey-id>` plus
 `PLAN012_EXPECTED_EXTERNAL_USER_ID=<safe-user-id>` when validating by survey
 response ID.
+
+The runner defaults `SMOKE_GRPC_TIMEOUT_SECONDS` to `30` for deployed Cloud Run
+gRPC cold starts.

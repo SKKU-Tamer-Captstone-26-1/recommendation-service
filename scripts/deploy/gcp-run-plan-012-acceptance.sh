@@ -39,6 +39,7 @@ fi
   || fail "set PLAN012_ALLOW_EVENT_WRITE=1 to record the smoke impression event"
 
 export SMOKE_GRPC_TLS="${SMOKE_GRPC_TLS:-1}"
+export SMOKE_GRPC_TIMEOUT_SECONDS="${SMOKE_GRPC_TIMEOUT_SECONDS:-30}"
 export AUTH_SMOKE_GRPC_ADDR="${AUTH_SMOKE_GRPC_ADDR:-authorization-service-44649239380.asia-northeast3.run.app:443}"
 export AUTH_SMOKE_EXPECTED_ISSUER="${AUTH_SMOKE_EXPECTED_ISSUER:-on-the-block-auth}"
 export AUTH_SMOKE_EXPECTED_AUDIENCE="${AUTH_SMOKE_EXPECTED_AUDIENCE:-recommendation-service}"

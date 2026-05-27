@@ -390,6 +390,7 @@ write approval are available:
 ```bash
 PLAN012_SAFE_SURVEY_EXTERNAL_USER_ID=<safe-user-id> \
 SMOKE_AUTH_BEARER_TOKEN=<safe-staging-token-for-same-user> \
+SMOKE_GRPC_TIMEOUT_SECONDS=30 \
 PLAN012_ALLOW_PROFILE_WRITE=1 \
 PLAN012_ALLOW_EVENT_WRITE=1 \
 GCP_PROJECT=on-the-block-2026 \
@@ -414,6 +415,8 @@ The runner performs:
 
 Set `PLAN012_PROFILE_ALREADY_ACTIVE=1` only when the profile was already
 generated through the deployed survey adapter and should not be written again.
+The script defaults `SMOKE_GRPC_TIMEOUT_SECONDS` to `30` because deployed Cloud
+Run gRPC services may cold start slowly.
 
 Current deployed evidence:
 
@@ -422,6 +425,7 @@ revision = recommendation-service-00003-b2d
 traffic = 100%
 grpc_host = recommendation-service-vcuepibcwq-du.a.run.app:443
 grpc_health = SERVING
+health_only_deployed_smoke_timeout = 30s
 health_only_deployed_smoke = pass
 GetProfileStatus without bearer token = UNAUTHENTICATED
 GetProfileStatus with invalid bearer token = UNAUTHENTICATED TOKEN_INVALID

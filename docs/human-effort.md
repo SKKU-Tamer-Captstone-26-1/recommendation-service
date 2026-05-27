@@ -249,6 +249,9 @@ Current repo evidence:
 - `scripts/deploy/gcp-run-plan-012-acceptance.sh` now runs the remaining Plan
   012 gates in order when a safe survey user/response, matching auth token, and
   explicit profile/event write opt-ins are provided.
+- Health-only deployed auth, survey, and recommendation smokes pass with
+  `SMOKE_GRPC_TIMEOUT_SECONDS=30`; the default runner timeout is set to 30s to
+  tolerate Cloud Run cold starts.
 
 Human-provided inputs needed:
 
