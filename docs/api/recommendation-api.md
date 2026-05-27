@@ -77,6 +77,11 @@ JWT sub -> external_user_id
 
 `recommendation-service` MUST NOT issue, refresh, or own JWTs.
 
+Deployed staging validates bearer tokens by calling auth-service gRPC
+`ValidateToken` (`AUTH_TOKEN_VALIDATION_MODE=grpc`). JWKS verification is kept
+only as an explicit fallback mode for environments where auth-service exposes an
+HTTP JWKS endpoint.
+
 Public RPC requests MUST NOT contain `user_id` or `external_user_id` fields.
 
 ## gRPC Services

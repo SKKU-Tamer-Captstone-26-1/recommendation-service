@@ -3,7 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+import grpc
+
 from app.core.config import Settings
+from app.grpc.gen import auth_pb2, auth_pb2_grpc
 
 
 class AuthError(ValueError):
@@ -72,6 +75,57 @@ class JwtAuthContextResolver:
         return payload
 
 
+class GrpcAuthContextResolver:
+    """Resolve caller identity through auth-service token validation RPC."""
+
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        stub: auth_pb2_grpc.AuthServiceStub | None = None,
+    ) -> None:
+        self._settings = settings
+        self._stub = stub
+        self._channel: grpc.Channel | None = None
+
+    def resolve_external_user_id(self, metadata: dict[str, str]) -> str:
+        token = _bearer_token(metadata)
+        try:
+            response = self._get_stub().ValidateToken(
+                auth_pb2.ValidateTokenRequest(access_token=token),
+                timeout=self._settings.auth_request_timeout_seconds,
+            )
+        except grpc.RpcError as exc:
+            code = exc.code().name if exc.code() is not None else "UNKNOWN"
+            raise AuthError(
+                f"auth-service token validation RPC failed: {code}"
+            ) from exc
+
+        if not response.valid:
+            reason = response.reason or "token invalid"
+            raise AuthError(f"auth-service rejected bearer token: {reason}")
+        if not response.user_id:
+            raise AuthError("auth-service token validation returned no user_id")
+        return response.user_id
+
+    def _get_stub(self):
+        if self._stub is not None:
+            return self._stub
+        if self._channel is None:
+            self._channel = _auth_grpc_channel(self._settings)
+        self._stub = auth_pb2_grpc.AuthServiceStub(self._channel)
+        return self._stub
+
+
+def create_auth_context_resolver(settings: Settings) -> AuthContextResolver:
+    mode = settings.auth_token_validation_mode.lower()
+    if mode == "grpc":
+        return GrpcAuthContextResolver(settings)
+    if mode in {"jwks", "jwt"}:
+        return JwtAuthContextResolver(settings)
+    raise ValueError(f"unsupported auth token validation mode: {mode}")
+
+
 def metadata_to_dict(metadata: object) -> dict[str, str]:
     return {
         key.lower(): value
@@ -99,3 +153,17 @@ def _jwt_module():
     except ImportError as exc:  # pragma: no cover - depends on installed extras
         raise AuthError("PyJWT[crypto] is required for JWT verification") from exc
     return jwt
+
+
+def _auth_grpc_channel(settings: Settings) -> grpc.Channel:
+    use_tls = (
+        settings.auth_service_grpc_tls
+        if settings.auth_service_grpc_tls is not None
+        else settings.auth_service_grpc_addr.endswith(":443")
+    )
+    if use_tls:
+        return grpc.secure_channel(
+            settings.auth_service_grpc_addr,
+            grpc.ssl_channel_credentials(),
+        )
+    return grpc.insecure_channel(settings.auth_service_grpc_addr)

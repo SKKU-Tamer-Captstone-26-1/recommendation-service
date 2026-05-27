@@ -78,19 +78,32 @@ map_snapshot_deployed_smoke = pass
 
 ### Auth-Service Production Metadata
 
-Status: external confirmation required before production release.
+Status: partially unblocked; deployed gRPC auth metadata can be checked, but a
+safe auth JWT is still required for end-to-end recommendation RPC smoke.
+
+Current repo evidence:
+
+- Deployed auth-service Cloud Run URL is
+  `https://authorization-service-vcuepibcwq-du.a.run.app`.
+- HTTP `/.well-known/jwks.json` on the deployed auth-service returns gRPC
+  `415 Content-Type is missing from the request`; deployed auth is gRPC-only for
+  this integration path.
+- gRPC reflection exposes `AuthService.GetPublicKeys` and
+  `AuthService.ValidateToken`.
+- recommendation-service now supports `AUTH_TOKEN_VALIDATION_MODE=grpc`, which
+  calls auth-service `ValidateToken` instead of issuing or decoding tokens as a
+  data owner.
 
 Human-provided inputs needed:
 
-- exact JWKS URL
-- issuer and audience values
-- whether the deployed gRPC endpoint is exposed over TLS on `:443`
+- safe auth-service JWT for deployed recommendation smoke
 - gateway metadata keys forwarded to recommendation-service
 
 Acceptance evidence when unblocked:
 
 ```text
-auth_context_smoke = pass
+auth_public_keys_smoke = pass
+auth_token_smoke = pending_safe_auth_jwt
 ```
 
 ### Deployed Chat-Service Recommendation Smoke

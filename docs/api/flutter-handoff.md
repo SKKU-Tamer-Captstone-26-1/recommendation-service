@@ -36,6 +36,9 @@ authorization: Bearer <auth-service-jwt>
 
 Flutter must not send `user_id` or `external_user_id` in recommendation
 requests. `recommendation-service` resolves the user from JWT `sub`.
+In deployed staging, recommendation-service resolves the bearer token by
+calling auth-service gRPC `ValidateToken`; it does not issue or decode tokens as
+an auth owner.
 
 Current deployed smoke evidence:
 

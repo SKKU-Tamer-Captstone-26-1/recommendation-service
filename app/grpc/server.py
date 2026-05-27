@@ -8,7 +8,7 @@ from app.core.config import Settings, get_settings
 from app.db.session import SessionLocal
 from app.grpc.gen import recommendation_pb2_grpc
 from app.grpc.recommendation_service import RecommendationGrpcServicer
-from app.services.auth import JwtAuthContextResolver
+from app.services.auth import create_auth_context_resolver
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ def create_grpc_server(
     recommendation_pb2_grpc.add_RecommendationServiceServicer_to_server(
         RecommendationGrpcServicer(
             SessionLocal,
-            JwtAuthContextResolver(resolved_settings),
+            create_auth_context_resolver(resolved_settings),
         ),
         server,
     )

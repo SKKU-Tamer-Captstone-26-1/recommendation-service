@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package ontheblock.auth.v1;
+
+option java_package = "com.ontheblock.auth.v1";
+option java_multiple_files = true;
+option go_package = "github.com/ontheblock/infra/proto/auth/v1;authv1";
+
+import "google/protobuf/timestamp.proto";
+
+// Minimal auth-service contract consumed by recommendation-service.
+//
+// auth-service remains the canonical owner of users, roles, login state, and
+// JWT issuance. recommendation-service only validates bearer tokens and reads
+// public key metadata through service APIs.
+service AuthService {
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+  rpc GetPublicKeys(GetPublicKeysRequest) returns (GetPublicKeysResponse);
+}
+
+message ValidateTokenRequest {
+  string access_token = 1;
+}
+
+message ValidateTokenResponse {
+  bool valid = 1;
+  string user_id = 2;
+  string email = 3;
+  Role role = 4;
+  google.protobuf.Timestamp expires_at = 5;
+  string reason = 6;
+  string nickname = 7;
+}
+
+message GetPublicKeysRequest {}
+
+message GetPublicKeysResponse {
+  repeated PublicKeyEntry keys = 1;
+}
+
+message PublicKeyEntry {
+  string kid = 1;
+  string public_key_pem = 2;
+  bool is_current = 3;
+}
+
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ROLE_NORMAL = 1;
+  ROLE_ADMIN = 2;
+  ROLE_BAR = 3;
+  ROLE_REQUE = 4;
+}

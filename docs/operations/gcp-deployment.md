@@ -224,6 +224,8 @@ GRPC_PORT=8080
 AUTH_SERVICE_URL=https://authorization-service-vcuepibcwq-du.a.run.app
 AUTH_JWKS_URL=https://authorization-service-vcuepibcwq-du.a.run.app/.well-known/jwks.json
 AUTH_SERVICE_GRPC_ADDR=authorization-service-vcuepibcwq-du.a.run.app:443
+AUTH_SERVICE_GRPC_TLS=true
+AUTH_TOKEN_VALIDATION_MODE=grpc
 JWT_ISSUER=on-the-block-auth
 JWT_AUDIENCE=recommendation-service
 SURVEY_SERVICE_URL=https://survey-service-vcuepibcwq-du.a.run.app
@@ -373,6 +375,8 @@ grpc_health = SERVING
 health_only_deployed_smoke = pass
 GetProfileStatus without bearer token = UNAUTHENTICATED
 latest_migration = 0004_survey_mapper_v1_1
+auth_validation_mode = grpc ValidateToken
+auth_grpc_public_keys_smoke = pass
 ```
 
 ## Rollback

@@ -131,6 +131,10 @@ smoke checks gRPC health without requiring a user JWT. This confirms Cloud Run
 gRPC reachability only; full profile and recommendation RPC evidence still
 requires a safe auth-service JWT and active profile.
 
+If `AUTH_SMOKE_GRPC_ADDR` is set, the auth deployed smoke checks auth-service
+gRPC `GetPublicKeys`. This confirms auth-service gRPC reachability and public
+key availability without requiring recommendation-service to own JWT issuance.
+
 ## Optional Cloud Run Deploy Gate
 
 Before deploying the gRPC service, review:

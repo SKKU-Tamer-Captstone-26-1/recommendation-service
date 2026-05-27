@@ -194,7 +194,9 @@ Rules:
 - Service URLs MUST target service APIs, not service databases.
 - gRPC addresses SHOULD be used for MSA service-to-service calls.
 - JWT configuration MUST verify tokens issued by `auth-service`; this service
-  MUST NOT issue JWTs.
+  MUST NOT issue JWTs. Deployed staging uses auth-service gRPC `ValidateToken`;
+  HTTP JWKS remains a fallback only when auth-service exposes an HTTP JWKS
+  endpoint.
 
 Current deployed `auth-service` URL:
 
@@ -209,10 +211,13 @@ defaults:
 AUTH_SERVICE_URL=https://authorization-service-44649239380.asia-northeast3.run.app
 AUTH_JWKS_URL=https://authorization-service-44649239380.asia-northeast3.run.app/.well-known/jwks.json
 AUTH_SERVICE_GRPC_ADDR=authorization-service-44649239380.asia-northeast3.run.app:443
+AUTH_SERVICE_GRPC_TLS=true
+AUTH_TOKEN_VALIDATION_MODE=grpc
 ```
 
-Before production JWT verification depends on this endpoint, confirm the exact
-JWKS path and whether the deployed gRPC endpoint is exposed over TLS on `:443`.
+Before production release, confirm the gateway/auth flow provides a safe token
+for deployed smoke. recommendation-service must continue resolving identity
+through auth-service APIs, not by minting tokens or reading auth storage.
 
 ## Repository Conventions
 

@@ -46,6 +46,9 @@ class Settings(BaseSettings):
 
     auth_service_url: str = "http://localhost:8081"
     auth_service_grpc_addr: str = "localhost:50052"
+    auth_service_grpc_tls: bool | None = None
+    auth_token_validation_mode: str = "grpc"
+    auth_request_timeout_seconds: float = 5.0
     auth_jwks_url: str = "http://localhost:8081/.well-known/jwks.json"
     jwt_issuer: str = "on-the-block-auth"
     jwt_audience: str = "recommendation-service"

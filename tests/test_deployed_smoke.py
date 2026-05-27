@@ -1,5 +1,6 @@
 from grpc_health.v1 import health_pb2
 
+from app.grpc.gen import auth_pb2
 from app.services import deployed_smoke
 from app.services.deployed_smoke import SmokeResult, run_deployed_smokes
 
@@ -35,6 +36,53 @@ def test_smoke_result_serializes_for_json_output() -> None:
         "status": "passed",
         "detail": "jwks_keys=1",
     }
+
+
+def test_auth_smoke_can_verify_grpc_public_keys(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeChannel:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    class FakeAuthStub:
+        def __init__(self, channel) -> None:
+            captured["channel"] = channel
+
+        def GetPublicKeys(self, request, *, timeout):
+            captured["timeout"] = timeout
+            return auth_pb2.GetPublicKeysResponse(
+                keys=[auth_pb2.PublicKeyEntry(kid="kid_1", public_key_pem="pem")],
+            )
+
+    monkeypatch.setattr(
+        deployed_smoke,
+        "_grpc_channel",
+        lambda addr, env: FakeChannel(),
+    )
+    monkeypatch.setattr(deployed_smoke.auth_pb2_grpc, "AuthServiceStub", FakeAuthStub)
+
+    result = deployed_smoke.smoke_auth_metadata(
+        {
+            "AUTH_SMOKE_GRPC_ADDR": "authorization-service.example:443",
+            "SMOKE_GRPC_TIMEOUT_SECONDS": "3",
+            "AUTH_SMOKE_EXPECTED_ISSUER": "on-the-block-auth",
+            "AUTH_SMOKE_EXPECTED_AUDIENCE": "recommendation-service",
+        },
+    )
+
+    assert result == SmokeResult(
+        name="auth",
+        status="passed",
+        detail=(
+            "public_keys=1 expected_issuer=on-the-block-auth "
+            "expected_audience=recommendation-service"
+        ),
+    )
+    assert captured["timeout"] == 3.0
 
 
 def test_survey_smoke_can_verify_grpc_health(monkeypatch) -> None:

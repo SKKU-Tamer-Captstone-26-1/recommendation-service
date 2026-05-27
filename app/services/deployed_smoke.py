@@ -10,7 +10,12 @@ import grpc
 import httpx
 from grpc_health.v1 import health_pb2, health_pb2_grpc
 
-from app.grpc.gen import recommendation_pb2, recommendation_pb2_grpc
+from app.grpc.gen import (
+    auth_pb2,
+    auth_pb2_grpc,
+    recommendation_pb2,
+    recommendation_pb2_grpc,
+)
 
 
 class SmokeSkipped(RuntimeError):
@@ -65,6 +70,10 @@ def run_deployed_smokes(
 
 
 def smoke_auth_metadata(env: Env) -> SmokeResult:
+    grpc_addr = env.get("AUTH_SMOKE_GRPC_ADDR")
+    if grpc_addr:
+        return _smoke_auth_grpc(env, grpc_addr)
+
     jwks_url = _required_env(env, "AUTH_SMOKE_JWKS_URL")
     timeout = _float_env(env, "SMOKE_HTTP_TIMEOUT_SECONDS", 10.0)
     response = httpx.get(jwks_url, timeout=timeout)
@@ -80,6 +89,33 @@ def smoke_auth_metadata(env: Env) -> SmokeResult:
         details.append(f"expected_issuer={issuer}")
     if audience:
         details.append(f"expected_audience={audience}")
+    return SmokeResult(name="auth", status="passed", detail=" ".join(details))
+
+
+def _smoke_auth_grpc(env: Env, addr: str) -> SmokeResult:
+    timeout = _float_env(env, "SMOKE_GRPC_TIMEOUT_SECONDS", 10.0)
+    with _grpc_channel(addr, env) as channel:
+        stub = auth_pb2_grpc.AuthServiceStub(channel)
+        response = stub.GetPublicKeys(auth_pb2.GetPublicKeysRequest(), timeout=timeout)
+        if not response.keys:
+            raise RuntimeError("auth GetPublicKeys returned no keys")
+        details = [f"public_keys={len(response.keys)}"]
+        if env.get("AUTH_SMOKE_EXPECTED_ISSUER"):
+            details.append(f"expected_issuer={env['AUTH_SMOKE_EXPECTED_ISSUER']}")
+        if env.get("AUTH_SMOKE_EXPECTED_AUDIENCE"):
+            details.append(f"expected_audience={env['AUTH_SMOKE_EXPECTED_AUDIENCE']}")
+        token = env.get("SMOKE_AUTH_BEARER_TOKEN")
+        if token:
+            token_response = stub.ValidateToken(
+                auth_pb2.ValidateTokenRequest(access_token=token),
+                timeout=timeout,
+            )
+            if not token_response.valid:
+                raise RuntimeError(
+                    "auth ValidateToken rejected smoke token: "
+                    f"{token_response.reason or 'token invalid'}",
+                )
+            details.append("token_valid=true")
     return SmokeResult(name="auth", status="passed", detail=" ".join(details))
 
 
