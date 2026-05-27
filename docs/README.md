@@ -163,6 +163,7 @@ Domain docs live here:
 | Survey sync and regeneration | `recommendation/sync-flow.md` |
 | Kakao API policy | `integrations/kakao-api-policy.md` |
 | API contracts | `api/recommendation-api.md` |
+| Flutter recommendation handoff | `api/flutter-handoff.md` |
 | PostgreSQL and Qdrant metadata model | `database/erd.md` |
 | Migration rules | `database/migration-strategy.md` |
 | Release gate | `operations/release-gate.md` |

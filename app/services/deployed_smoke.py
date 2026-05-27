@@ -163,6 +163,9 @@ def smoke_map_service(env: Env) -> SmokeResult:
 
 def smoke_recommendation_service(env: Env) -> SmokeResult:
     addr = _required_env(env, "RECOMMENDATION_SMOKE_GRPC_ADDR")
+    if _bool_env(env, "RECOMMENDATION_SMOKE_HEALTH_ONLY", False):
+        return _smoke_recommendation_grpc_health(env, addr)
+
     token = _required_env(env, "SMOKE_AUTH_BEARER_TOKEN")
     timeout = _float_env(env, "SMOKE_GRPC_TIMEOUT_SECONDS", 10.0)
     metadata = (("authorization", f"Bearer {token}"),)
@@ -213,6 +216,27 @@ def smoke_recommendation_service(env: Env) -> SmokeResult:
         name="recommendation",
         status="passed",
         detail=" ".join(details),
+    )
+
+
+def _smoke_recommendation_grpc_health(env: Env, addr: str) -> SmokeResult:
+    timeout = _float_env(env, "SMOKE_GRPC_TIMEOUT_SECONDS", 10.0)
+    with _recommendation_channel(addr, env) as channel:
+        stub = health_pb2_grpc.HealthStub(channel)
+        response = stub.Check(
+            health_pb2.HealthCheckRequest(
+                service=env.get("RECOMMENDATION_SMOKE_HEALTH_SERVICE", ""),
+            ),
+            timeout=timeout,
+        )
+    if response.status != health_pb2.HealthCheckResponse.SERVING:
+        raise RuntimeError(
+            f"recommendation health status is not SERVING: {response.status}",
+        )
+    return SmokeResult(
+        name="recommendation",
+        status="passed",
+        detail="grpc_health=SERVING rpc_contract=not_verified",
     )
 
 

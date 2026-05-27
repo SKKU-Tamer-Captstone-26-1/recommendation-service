@@ -113,6 +113,7 @@ SURVEY_SMOKE_BASE_URL
 SURVEY_SMOKE_GRPC_ADDR
 MAP_SMOKE_BASE_URL
 RECOMMENDATION_SMOKE_GRPC_ADDR
+RECOMMENDATION_SMOKE_HEALTH_ONLY
 CHAT_SMOKE_HTTP_URL
 CHAT_SMOKE_GRPC_ADDR
 SMOKE_AUTH_BEARER_TOKEN
@@ -124,6 +125,11 @@ health. This confirms deployed protocol reachability only; it is not evidence
 that the recommendation survey sync contract is deployed. Full survey sync
 evidence still requires the event/response contract in
 `docs/recommendation/sync-flow.md`.
+
+If `RECOMMENDATION_SMOKE_HEALTH_ONLY=true` is set, the recommendation deployed
+smoke checks gRPC health without requiring a user JWT. This confirms Cloud Run
+gRPC reachability only; full profile and recommendation RPC evidence still
+requires a safe auth-service JWT and active profile.
 
 ## Optional Cloud Run Deploy Gate
 

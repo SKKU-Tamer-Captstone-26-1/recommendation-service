@@ -311,7 +311,7 @@ It is staging-only and does not replace cursor-based production sync.
 After Cloud Run reports a ready revision:
 
 ```bash
-RECOMMENDATION_SMOKE_GRPC_ADDR=<recommendation-cloud-run-host>:443 \
+RECOMMENDATION_SMOKE_GRPC_ADDR=recommendation-service-vcuepibcwq-du.a.run.app:443 \
 SMOKE_AUTH_BEARER_TOKEN=<safe-staging-token> \
 SMOKE_GRPC_TLS=1 \
 python3 -m app.tools.deployed_smoke --mode recommendation
@@ -326,6 +326,16 @@ RECOMMENDATION_SMOKE_EXPECT_ACTIVE_PROFILE=true \
 RECOMMENDATION_SMOKE_RUN_BEVERAGE=true \
 SMOKE_GRPC_TLS=1 \
 python3 -m app.tools.deployed_smoke --mode recommendation
+```
+
+Current deployed evidence:
+
+```text
+revision = recommendation-service-00001-wj8
+grpc_host = recommendation-service-vcuepibcwq-du.a.run.app:443
+grpc_health = SERVING
+health_only_deployed_smoke = pass
+GetProfileStatus without bearer token = UNAUTHENTICATED
 ```
 
 ## Rollback

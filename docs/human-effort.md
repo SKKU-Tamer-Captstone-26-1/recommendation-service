@@ -212,10 +212,18 @@ Current repo evidence:
   smoke, and beverage recommendation smoke passed on 2026-05-27.
 - The remaining survey-side blocker is a safe deployed survey user or survey ID
   for `app.tools.survey_result_adapter`.
+- Cloud Run service `recommendation-service` deployed on 2026-05-27 at
+  `recommendation-service-vcuepibcwq-du.a.run.app:443`.
+- Deployed gRPC health returns `SERVING`.
+- Health-only deployed recommendation smoke passes with
+  `RECOMMENDATION_SMOKE_HEALTH_ONLY=true`.
+- `GetProfileStatus` without bearer metadata returns `UNAUTHENTICATED`.
+- Flutter handoff is documented in `docs/api/flutter-handoff.md`.
 
 Human-provided inputs needed:
 
 - safe deployed survey test user ID or survey ID allowed for adapter smoke
+- safe auth-service JWT for deployed recommendation smoke
 - Cloud Run ingress decision: private behind gateway or reviewed public staging
   smoke path
 

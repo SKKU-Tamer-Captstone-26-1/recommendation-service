@@ -83,3 +83,51 @@ def test_survey_smoke_can_verify_grpc_health(monkeypatch) -> None:
     assert captured["service"] == "ontheblock.survey.v1.SurveyService"
     assert captured["timeout"] == 3.0
     assert captured["metadata"] == (("authorization", "Bearer token"),)
+
+
+def test_recommendation_smoke_can_verify_grpc_health_only(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeChannel:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    class FakeHealthStub:
+        def __init__(self, channel) -> None:
+            captured["channel"] = channel
+
+        def Check(self, request, *, timeout):
+            captured["service"] = request.service
+            captured["timeout"] = timeout
+            return health_pb2.HealthCheckResponse(
+                status=health_pb2.HealthCheckResponse.SERVING,
+            )
+
+    monkeypatch.setattr(
+        deployed_smoke,
+        "_recommendation_channel",
+        lambda addr, env: FakeChannel(),
+    )
+    monkeypatch.setattr(deployed_smoke.health_pb2_grpc, "HealthStub", FakeHealthStub)
+
+    result = deployed_smoke.smoke_recommendation_service(
+        {
+            "RECOMMENDATION_SMOKE_GRPC_ADDR": "recommendation-service.example:443",
+            "RECOMMENDATION_SMOKE_HEALTH_ONLY": "true",
+            "RECOMMENDATION_SMOKE_HEALTH_SERVICE": (
+                "ontheblock.recommendation.v1.RecommendationService"
+            ),
+            "SMOKE_GRPC_TIMEOUT_SECONDS": "3",
+        },
+    )
+
+    assert result == SmokeResult(
+        name="recommendation",
+        status="passed",
+        detail="grpc_health=SERVING rpc_contract=not_verified",
+    )
+    assert captured["service"] == "ontheblock.recommendation.v1.RecommendationService"
+    assert captured["timeout"] == 3.0
