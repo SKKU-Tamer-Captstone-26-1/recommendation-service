@@ -1,6 +1,6 @@
 from grpc_health.v1 import health_pb2
 
-from app.grpc.gen import auth_pb2
+from app.grpc.gen import auth_pb2, recommendation_pb2
 from app.services import deployed_smoke
 from app.services.deployed_smoke import SmokeResult, run_deployed_smokes
 
@@ -179,3 +179,89 @@ def test_recommendation_smoke_can_verify_grpc_health_only(monkeypatch) -> None:
     )
     assert captured["service"] == "ontheblock.recommendation.v1.RecommendationService"
     assert captured["timeout"] == 3.0
+
+
+def test_recommendation_smoke_can_record_beverage_event(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeChannel:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    class FakeRecommendationStub:
+        def __init__(self, channel) -> None:
+            captured["channel"] = channel
+
+        def GetProfileStatus(self, request, *, timeout, metadata):
+            captured["status_metadata"] = metadata
+            return recommendation_pb2.GetProfileStatusResponse(
+                status=recommendation_pb2.PROFILE_STATUS_ACTIVE,
+                profile_revision=1,
+            )
+
+        def GetBeverageRecommendations(self, request, *, timeout, metadata):
+            captured["beverage_category"] = request.category
+            return recommendation_pb2.GetBeverageRecommendationsResponse(
+                request_id="11111111-1111-4111-8111-111111111111",
+                profile_status=recommendation_pb2.PROFILE_STATUS_ACTIVE,
+                profile_revision=1,
+                recommendations=[
+                    recommendation_pb2.BeverageRecommendation(
+                        result_id="22222222-2222-4222-8222-222222222222",
+                        beverage_id="bev_1",
+                    ),
+                ],
+            )
+
+        def RecordRecommendationEvent(self, request, *, timeout, metadata):
+            captured["event_request_id"] = request.request_id
+            captured["event_result_id"] = request.result_id
+            captured["event_type"] = request.event_type
+            captured["event_metadata"] = dict(request.metadata)
+            return recommendation_pb2.RecordRecommendationEventResponse(
+                interaction_id="33333333-3333-4333-8333-333333333333",
+                duplicate=False,
+            )
+
+    monkeypatch.setattr(
+        deployed_smoke,
+        "_recommendation_channel",
+        lambda addr, env: FakeChannel(),
+    )
+    monkeypatch.setattr(
+        deployed_smoke.recommendation_pb2_grpc,
+        "RecommendationServiceStub",
+        FakeRecommendationStub,
+    )
+
+    result = deployed_smoke.smoke_recommendation_service(
+        {
+            "RECOMMENDATION_SMOKE_GRPC_ADDR": "recommendation-service.example:443",
+            "SMOKE_AUTH_BEARER_TOKEN": "token",
+            "RECOMMENDATION_SMOKE_EXPECT_ACTIVE_PROFILE": "true",
+            "RECOMMENDATION_SMOKE_RUN_BEVERAGE": "true",
+            "RECOMMENDATION_SMOKE_RECORD_EVENT": "true",
+            "RECOMMENDATION_SMOKE_CATEGORY": "whiskey",
+        },
+    )
+
+    assert result == SmokeResult(
+        name="recommendation",
+        status="passed",
+        detail=(
+            "profile_status=3 beverage_results=1 event_recorded=true "
+            "event_duplicate=false"
+        ),
+    )
+    assert captured["beverage_category"] == "whiskey"
+    assert captured["event_request_id"] == "11111111-1111-4111-8111-111111111111"
+    assert captured["event_result_id"] == "22222222-2222-4222-8222-222222222222"
+    assert (
+        captured["event_type"]
+        == recommendation_pb2.RECOMMENDATION_EVENT_TYPE_IMPRESSION
+    )
+    assert captured["event_metadata"]["source"] == "codex_smoke"
+    assert captured["status_metadata"] == (("authorization", "Bearer token"),)

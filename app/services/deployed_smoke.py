@@ -8,6 +8,7 @@ from typing import Any
 
 import grpc
 import httpx
+from google.protobuf import struct_pb2
 from grpc_health.v1 import health_pb2, health_pb2_grpc
 
 from app.grpc.gen import (
@@ -207,6 +208,7 @@ def smoke_recommendation_service(env: Env) -> SmokeResult:
     metadata = (("authorization", f"Bearer {token}"),)
     with _recommendation_channel(addr, env) as channel:
         stub = recommendation_pb2_grpc.RecommendationServiceStub(channel)
+        beverage_response = None
         status = stub.GetProfileStatus(
             recommendation_pb2.GetProfileStatusRequest(),
             timeout=timeout,
@@ -221,7 +223,7 @@ def smoke_recommendation_service(env: Env) -> SmokeResult:
                 )
 
         if _bool_env(env, "RECOMMENDATION_SMOKE_RUN_BEVERAGE", False):
-            response = stub.GetBeverageRecommendations(
+            beverage_response = stub.GetBeverageRecommendations(
                 recommendation_pb2.GetBeverageRecommendationsRequest(
                     category=env.get("RECOMMENDATION_SMOKE_CATEGORY", ""),
                     limit=_int_env(env, "RECOMMENDATION_SMOKE_LIMIT", 3),
@@ -230,7 +232,40 @@ def smoke_recommendation_service(env: Env) -> SmokeResult:
                 timeout=timeout,
                 metadata=metadata,
             )
-            details.append(f"beverage_results={len(response.recommendations)}")
+            details.append(
+                f"beverage_results={len(beverage_response.recommendations)}",
+            )
+            if _bool_env(env, "RECOMMENDATION_SMOKE_RECORD_EVENT", False):
+                if not beverage_response.recommendations:
+                    raise RuntimeError(
+                        "recommendation smoke cannot record event without "
+                        "beverage recommendations",
+                    )
+                first = beverage_response.recommendations[0]
+                event_response = stub.RecordRecommendationEvent(
+                    recommendation_pb2.RecordRecommendationEventRequest(
+                        request_id=beverage_response.request_id,
+                        result_id=first.result_id,
+                        event_type=(
+                            recommendation_pb2.RECOMMENDATION_EVENT_TYPE_IMPRESSION
+                        ),
+                        idempotency_key=(
+                            env.get("RECOMMENDATION_SMOKE_EVENT_IDEMPOTENCY_KEY")
+                            or (
+                                "deployed_smoke:"
+                                f"{beverage_response.request_id}:"
+                                f"{first.result_id}:impression"
+                            )
+                        ),
+                        metadata=_recommendation_event_metadata(env),
+                    ),
+                    timeout=timeout,
+                    metadata=metadata,
+                )
+                details.append(
+                    "event_recorded=true "
+                    f"event_duplicate={str(event_response.duplicate).lower()}",
+                )
 
         selected_beverage_id = env.get("RECOMMENDATION_SMOKE_SELECTED_BEVERAGE_ID")
         if selected_beverage_id:
@@ -253,6 +288,30 @@ def smoke_recommendation_service(env: Env) -> SmokeResult:
         status="passed",
         detail=" ".join(details),
     )
+
+
+def _recommendation_event_metadata(env: Env) -> struct_pb2.Struct:
+    metadata = struct_pb2.Struct()
+    metadata.update(
+        {
+            "client_platform": env.get(
+                "RECOMMENDATION_SMOKE_CLIENT_PLATFORM",
+                "codex",
+            ),
+            "surface": env.get("RECOMMENDATION_SMOKE_SURFACE", "deployed_smoke"),
+            "source": env.get("RECOMMENDATION_SMOKE_EVENT_SOURCE", "codex_smoke"),
+            "session_id_hash": env.get(
+                "RECOMMENDATION_SMOKE_SESSION_ID_HASH",
+                "deployed-smoke-session",
+            ),
+            "list_position": _int_env(env, "RECOMMENDATION_SMOKE_LIST_POSITION", 1),
+            "visible_ms": _int_env(env, "RECOMMENDATION_SMOKE_VISIBLE_MS", 0),
+        },
+    )
+    app_version = env.get("RECOMMENDATION_SMOKE_APP_VERSION")
+    if app_version:
+        metadata["app_version"] = app_version
+    return metadata
 
 
 def _smoke_recommendation_grpc_health(env: Env, addr: str) -> SmokeResult:

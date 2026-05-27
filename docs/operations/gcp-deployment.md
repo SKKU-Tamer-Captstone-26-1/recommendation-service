@@ -361,9 +361,14 @@ RECOMMENDATION_SMOKE_GRPC_ADDR=<recommendation-cloud-run-host>:443 \
 SMOKE_AUTH_BEARER_TOKEN=<safe-staging-token> \
 RECOMMENDATION_SMOKE_EXPECT_ACTIVE_PROFILE=true \
 RECOMMENDATION_SMOKE_RUN_BEVERAGE=true \
+RECOMMENDATION_SMOKE_RECORD_EVENT=true \
 SMOKE_GRPC_TLS=1 \
 python3 -m app.tools.deployed_smoke --mode recommendation
 ```
+
+`RECOMMENDATION_SMOKE_RECORD_EVENT=true` records an impression for the first
+beverage result using allowlisted smoke metadata. This completes the staging
+Flutter call sequence through `RecordRecommendationEvent`.
 
 Current deployed evidence:
 
