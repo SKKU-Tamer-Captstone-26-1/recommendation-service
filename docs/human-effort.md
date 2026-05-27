@@ -151,6 +151,8 @@ Current repo evidence:
 
 - Cloud Run gRPC deployment script exists at
   `scripts/deploy/gcp-cloud-run-grpc.sh`.
+- Staging Cloud SQL provisioning script exists at
+  `scripts/deploy/gcp-provision-staging-sql.sh`.
 - GCP deployment runbook exists at `docs/operations/gcp-deployment.md`.
 - The deploy script refuses obvious shared-service database secrets.
 - GCP inspection on 2026-05-27 found only these Secret Manager secrets:
@@ -161,11 +163,21 @@ Current repo evidence:
 - Non-deploying preflight with
   `RECOMMENDATION_DATABASE_SECRET=recommendation-db-dsn-staging` fails because
   the secret does not exist yet.
+- Staging Cloud SQL provisioning dry-run on 2026-05-27 initially reported
+  missing `recommendation-postgres-staging`, `recommendation_service`,
+  `recommendation_user`, and `recommendation-db-dsn-staging`.
+- First apply attempt failed because gcloud defaulted to Enterprise Plus, where
+  `db-f1-micro` is not valid; the provisioning script now explicitly requests
+  Cloud SQL Enterprise edition for the low-cost staging tier.
+- Apply mode on 2026-05-27 created Cloud SQL instance
+  `recommendation-postgres-staging`, database `recommendation_service`, user
+  `recommendation_user`, and Secret Manager secret
+  `recommendation-db-dsn-staging`.
+- Post-create dry-run on 2026-05-27 reports the recommendation Cloud SQL
+  instance, database, user, and secret all exist.
 
 Human-provided inputs needed:
 
-- dedicated recommendation PostgreSQL instance or dedicated database/user
-- Secret Manager secret containing the recommendation-owned `DATABASE_URL`
 - recommendation-owned Qdrant endpoint
 - Qdrant URL/API key secrets where required
 - Cloud Run runtime service account decision

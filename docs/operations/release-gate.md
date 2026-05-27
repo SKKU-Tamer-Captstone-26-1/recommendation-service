@@ -156,6 +156,16 @@ RECOMMENDATION_QDRANT_URL_SECRET=recommendation-qdrant-url-staging \
 bash scripts/deploy/gcp-cloud-run-grpc.sh
 ```
 
+Before the first staging deployment, inspect the dedicated Cloud SQL plan:
+
+```bash
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-provision-staging-sql.sh
+```
+
+Only run it with `RECOMMENDATION_PROVISION_APPLY=1` when creating billable
+staging resources is approved.
+
 ## Operations Metrics Endpoint
 
 The HTTP API exposes:

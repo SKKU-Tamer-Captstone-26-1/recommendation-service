@@ -51,6 +51,56 @@ The Cloud Run runtime service account must have Secret Manager access only for
 the recommendation-owned secrets it needs. Do not grant broad access to other
 service secrets.
 
+## Provision Staging PostgreSQL
+
+Dry-run inspection:
+
+```bash
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-provision-staging-sql.sh
+```
+
+Apply:
+
+```bash
+RECOMMENDATION_PROVISION_APPLY=1 \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-provision-staging-sql.sh
+```
+
+The script creates or confirms:
+
+```text
+instance = recommendation-postgres-staging
+edition = ENTERPRISE
+database = recommendation_service
+user = recommendation_user
+secret = recommendation-db-dsn-staging
+connection_name = on-the-block-2026:asia-northeast3:recommendation-postgres-staging
+```
+
+The secret stores a Cloud Run Cloud SQL connector DSN:
+
+```text
+postgresql+psycopg://recommendation_user:<password>@/recommendation_service?host=/cloudsql/<connection-name>
+```
+
+The staging user receives `cloudsqlsuperuser` by default because the foundation
+migration creates PostgreSQL extensions. Google Cloud documents that Cloud SQL
+PostgreSQL extensions can only be created by users in the `cloudsqlsuperuser`
+role, and PostGIS is supported for PostgreSQL 16:
+
+```text
+https://cloud.google.com/sql/docs/postgres/extensions
+```
+
+Production hardening follow-up:
+
+```text
+Create a separate migration owner and runtime app user before public launch.
+The runtime app user should not keep extension-creation privileges.
+```
+
 ## Deploy gRPC Service
 
 Preflight without deploying:

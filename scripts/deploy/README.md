@@ -64,6 +64,42 @@ bash scripts/deploy/gcp-cloud-run-grpc.sh
 This must pass before running the deploy without
 `RECOMMENDATION_DEPLOY_CHECK_ONLY`.
 
+## Staging Cloud SQL Provisioning
+
+Dry-run inspection:
+
+```bash
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-provision-staging-sql.sh
+```
+
+Create missing staging resources:
+
+```bash
+RECOMMENDATION_PROVISION_APPLY=1 \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-provision-staging-sql.sh
+```
+
+Defaults:
+
+```text
+instance = recommendation-postgres-staging
+database = recommendation_service
+user = recommendation_user
+secret = recommendation-db-dsn-staging
+region = asia-northeast3
+database_version = POSTGRES_16
+edition = ENTERPRISE
+tier = db-f1-micro
+storage = 10 GB
+```
+
+The staging user receives `cloudsqlsuperuser` by default because the current
+Alembic foundation migration creates `pgcrypto`, `postgis`, and `pg_trgm`.
+Before production, split migration and runtime users so the Cloud Run serving
+user does not need extension-creation privileges.
+
 ## Verification
 
 After deployment, run:
