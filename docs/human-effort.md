@@ -158,6 +158,9 @@ Current repo evidence:
   `chat-db-dsn-staging`.
 - GCP inspection on 2026-05-27 found only these Cloud SQL instances:
   `auth-postgres` and `ontheblock-chat-staging`.
+- Non-deploying preflight with
+  `RECOMMENDATION_DATABASE_SECRET=recommendation-db-dsn-staging` fails because
+  the secret does not exist yet.
 
 Human-provided inputs needed:
 

@@ -146,6 +146,16 @@ Minimum syntax check:
 bash -n scripts/deploy/gcp-cloud-run-grpc.sh
 ```
 
+When staging secrets exist, run the non-deploying preflight:
+
+```bash
+RECOMMENDATION_DEPLOY_CHECK_ONLY=1 \
+GCP_PROJECT=on-the-block-2026 \
+RECOMMENDATION_DATABASE_SECRET=recommendation-db-dsn-staging \
+RECOMMENDATION_QDRANT_URL_SECRET=recommendation-qdrant-url-staging \
+bash scripts/deploy/gcp-cloud-run-grpc.sh
+```
+
 ## Operations Metrics Endpoint
 
 The HTTP API exposes:

@@ -56,6 +56,7 @@ QDRANT_URL_VALUE="${RECOMMENDATION_QDRANT_URL:-}"
 CLOUD_SQL_INSTANCE="${RECOMMENDATION_CLOUD_SQL_INSTANCE:-}"
 SERVICE_ACCOUNT="${RECOMMENDATION_RUNTIME_SERVICE_ACCOUNT:-}"
 ALLOW_UNAUTHENTICATED="${RECOMMENDATION_ALLOW_UNAUTHENTICATED:-0}"
+CHECK_ONLY="${RECOMMENDATION_DEPLOY_CHECK_ONLY:-0}"
 
 AUTH_SERVICE_URL="${AUTH_SERVICE_URL:-https://authorization-service-vcuepibcwq-du.a.run.app}"
 AUTH_JWKS_URL="${AUTH_JWKS_URL:-https://authorization-service-vcuepibcwq-du.a.run.app/.well-known/jwks.json}"
@@ -124,6 +125,11 @@ echo "deploying ${SERVICE} to project=${PROJECT} region=${REGION}"
 echo "database_secret=${DATABASE_SECRET} cloud_sql_instance=${CLOUD_SQL_INSTANCE:-none}"
 echo "qdrant_url_source=$([[ -n "$QDRANT_URL_SECRET" ]] && echo secret || echo env)"
 echo "allow_unauthenticated=${ALLOW_UNAUTHENTICATED}"
+
+if [[ "$CHECK_ONLY" == "1" ]]; then
+  echo "deploy preflight passed"
+  exit 0
+fi
 
 gcloud run deploy "$SERVICE" \
   --project "$PROJECT" \

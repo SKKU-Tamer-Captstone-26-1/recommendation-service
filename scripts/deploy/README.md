@@ -48,6 +48,22 @@ The script refuses to deploy unless:
 Known shared-service names such as auth, chat, survey, map, gateway, and
 `DB_PASSWORD` are rejected as database secrets.
 
+## Preflight Only
+
+To validate project, Secret Manager, database-secret ownership, and Qdrant
+configuration without deploying:
+
+```bash
+RECOMMENDATION_DEPLOY_CHECK_ONLY=1 \
+GCP_PROJECT=on-the-block-2026 \
+RECOMMENDATION_DATABASE_SECRET=recommendation-db-dsn-staging \
+RECOMMENDATION_QDRANT_URL_SECRET=recommendation-qdrant-url-staging \
+bash scripts/deploy/gcp-cloud-run-grpc.sh
+```
+
+This must pass before running the deploy without
+`RECOMMENDATION_DEPLOY_CHECK_ONLY`.
+
 ## Verification
 
 After deployment, run:

@@ -53,6 +53,19 @@ service secrets.
 
 ## Deploy gRPC Service
 
+Preflight without deploying:
+
+```bash
+RECOMMENDATION_DEPLOY_CHECK_ONLY=1 \
+GCP_PROJECT=on-the-block-2026 \
+GCP_REGION=asia-northeast3 \
+RECOMMENDATION_DATABASE_SECRET=recommendation-db-dsn-staging \
+RECOMMENDATION_QDRANT_URL_SECRET=recommendation-qdrant-url-staging \
+RECOMMENDATION_QDRANT_API_KEY_SECRET=recommendation-qdrant-api-key-staging \
+RECOMMENDATION_CLOUD_SQL_INSTANCE=on-the-block-2026:asia-northeast3:recommendation-postgres-staging \
+bash scripts/deploy/gcp-cloud-run-grpc.sh
+```
+
 Default command:
 
 ```bash
