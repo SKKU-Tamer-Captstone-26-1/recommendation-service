@@ -217,6 +217,8 @@ Current repo evidence:
   for `app.tools.survey_result_adapter`.
 - Cloud Run service `recommendation-service` deployed on 2026-05-27 at
   `recommendation-service-vcuepibcwq-du.a.run.app:443`.
+- Current serving revision is `recommendation-service-00002-v8w` at 100%
+  traffic after applying mapper migration `0004_survey_mapper_v1_1`.
 - Deployed gRPC health returns `SERVING`.
 - Health-only deployed recommendation smoke passes with
   `RECOMMENDATION_SMOKE_HEALTH_ONLY=true`.

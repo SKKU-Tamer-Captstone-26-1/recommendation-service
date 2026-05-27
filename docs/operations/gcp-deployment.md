@@ -366,11 +366,13 @@ python3 -m app.tools.deployed_smoke --mode recommendation
 Current deployed evidence:
 
 ```text
-revision = recommendation-service-00001-wj8
+revision = recommendation-service-00002-v8w
+traffic = 100%
 grpc_host = recommendation-service-vcuepibcwq-du.a.run.app:443
 grpc_health = SERVING
 health_only_deployed_smoke = pass
 GetProfileStatus without bearer token = UNAUTHENTICATED
+latest_migration = 0004_survey_mapper_v1_1
 ```
 
 ## Rollback

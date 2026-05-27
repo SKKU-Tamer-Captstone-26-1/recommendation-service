@@ -40,6 +40,7 @@ requests. `recommendation-service` resolves the user from JWT `sub`.
 Current deployed smoke evidence:
 
 ```text
+cloud_run_revision = recommendation-service-00002-v8w
 grpc_health = SERVING
 GetProfileStatus without bearer token = UNAUTHENTICATED
 ```
