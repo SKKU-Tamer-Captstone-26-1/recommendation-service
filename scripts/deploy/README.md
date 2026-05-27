@@ -130,6 +130,34 @@ service_account = recommendation-qdrant-staging
 This is a staging-only, ephemeral Qdrant service. Qdrant remains rebuildable
 from recommendation PostgreSQL and must not be treated as canonical storage.
 
+## Staging Runtime IAM
+
+Dry-run inspection:
+
+```bash
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-provision-staging-runtime-iam.sh
+```
+
+Create the recommendation Cloud Run runtime service account and grant only the
+needed staging access:
+
+```bash
+RECOMMENDATION_RUNTIME_IAM_APPLY=1 \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-provision-staging-runtime-iam.sh
+```
+
+Defaults:
+
+```text
+service_account = recommendation-service-staging
+roles = roles/cloudsql.client
+secret_access = recommendation-db-dsn-staging,
+  recommendation-qdrant-url-staging,
+  recommendation-qdrant-api-key-staging
+```
+
 ## Verification
 
 After deployment, run:

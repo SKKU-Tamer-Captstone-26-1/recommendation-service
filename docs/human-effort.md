@@ -189,10 +189,21 @@ Current repo evidence:
 - Staging Qdrant HTTPS/API-key smoke passes with the application
   `qdrant-client` factory after the factory was fixed to stop forcing default
   port `6333` for full HTTPS URLs.
+- Runtime IAM provisioning script exists at
+  `scripts/deploy/gcp-provision-staging-runtime-iam.sh`.
+- Runtime IAM dry-run on 2026-05-27 reports DB/Qdrant secrets exist and the
+  recommendation runtime service account is missing.
+- Apply mode on 2026-05-27 created
+  `recommendation-service-staging@on-the-block-2026.iam.gserviceaccount.com`,
+  granted `roles/cloudsql.client`, and granted Secret Manager access only to
+  recommendation DB/Qdrant secrets.
+- Post-create runtime IAM dry-run on 2026-05-27 reports the service account and
+  DB/Qdrant secrets all exist.
+- Recommendation Cloud Run deploy preflight now passes with recommendation-owned
+  DB/Qdrant secrets and Cloud SQL connection configuration.
 
 Human-provided inputs needed:
 
-- Cloud Run runtime service account decision
 - Cloud Run ingress decision: private behind gateway or reviewed public staging
   smoke path
 

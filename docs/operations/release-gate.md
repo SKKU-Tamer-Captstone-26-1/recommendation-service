@@ -177,6 +177,16 @@ Only run it with `RECOMMENDATION_QDRANT_PROVISION_APPLY=1` when creating a
 temporary public Cloud Run Qdrant staging service protected by Qdrant API key is
 approved.
 
+Inspect runtime IAM before deploying jobs or services:
+
+```bash
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-provision-staging-runtime-iam.sh
+```
+
+Only run it with `RECOMMENDATION_RUNTIME_IAM_APPLY=1` after the
+recommendation-owned DB/Qdrant secrets exist.
+
 ## Operations Metrics Endpoint
 
 The HTTP API exposes:

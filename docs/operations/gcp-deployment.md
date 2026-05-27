@@ -149,6 +149,36 @@ Delete the staging Qdrant service and secrets only after PostgreSQL has the
 canonical vectors. Rebuild Qdrant from PostgreSQL after recreation.
 ```
 
+## Provision Runtime IAM
+
+Dry-run inspection:
+
+```bash
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-provision-staging-runtime-iam.sh
+```
+
+Apply:
+
+```bash
+RECOMMENDATION_RUNTIME_IAM_APPLY=1 \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-provision-staging-runtime-iam.sh
+```
+
+The script creates or confirms:
+
+```text
+service_account = recommendation-service-staging@on-the-block-2026.iam.gserviceaccount.com
+project_role = roles/cloudsql.client
+secret_access = recommendation-db-dsn-staging
+secret_access = recommendation-qdrant-url-staging
+secret_access = recommendation-qdrant-api-key-staging
+```
+
+Do not grant this service account access to auth, survey, chat, map, gateway,
+or shared database secrets.
+
 ## Deploy gRPC Service
 
 Preflight without deploying:
@@ -199,6 +229,12 @@ JWT_AUDIENCE=recommendation-service
 SURVEY_SERVICE_URL=https://survey-service-vcuepibcwq-du.a.run.app
 SURVEY_SERVICE_GRPC_ADDR=survey-service-vcuepibcwq-du.a.run.app:443
 SYNC_WORKER_ENABLED=false
+```
+
+Runtime service account:
+
+```text
+recommendation-service-staging@on-the-block-2026.iam.gserviceaccount.com
 ```
 
 `SYNC_WORKER_ENABLED=false` is intentional for this deployment slice because
