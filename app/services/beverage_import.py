@@ -443,7 +443,7 @@ def _source_ref_model(
 
 
 def _read_json(path: Path) -> dict[str, Any]:
-    with path.open() as handle:
+    with path.open(encoding="utf-8") as handle:
         value = json.load(handle)
     if not isinstance(value, dict):
         raise BeverageImportError(f"{path} must contain a JSON object")
@@ -452,7 +452,7 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    with path.open() as handle:
+    with path.open(encoding="utf-8") as handle:
         for line in handle:
             if line.strip():
                 value = json.loads(line)
@@ -463,7 +463,7 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 
 def _read_csv(path: Path) -> list[dict[str, Any]]:
-    with path.open(newline="") as handle:
+    with path.open(newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
 
 
