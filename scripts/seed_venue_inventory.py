@@ -1,147 +1,107 @@
-"""Seed venue snapshots and inventory from canonical map-service markers.
+"""Seed venue inventory from a local map snapshot fixture.
 
-Reads liquor-shop markers directly from map-service DB and creates:
-  - VenueSnapshot  (one per canonical venue)
-  - VenueInventorySnapshot  (links venue to canonical beverage_items)
-
-Run once against local DBs:
-    python scripts/seed_venue_inventory.py
+This is a local dummy-test helper only. It must not read map-service databases.
+Production map/place data must arrive through map-service APIs, events, or
+snapshot feeds and then flow through MapSnapshotImportService.
 """
+
 from __future__ import annotations
 
-import os
+import argparse
+import json
 import sys
-import uuid
-from datetime import UTC, datetime, timedelta
+from copy import deepcopy
 from pathlib import Path
+from typing import Any
 
-# Allow running from repo root
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-import psycopg
-from psycopg.rows import dict_row
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.session import engine
-from app.models.catalog import BeverageItem, VenueInventorySnapshot, VenueSnapshot
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-MAP_DB_URL = os.environ.get(
-    "MAP_DATABASE_URL",
-    "postgresql://map_user:map_pass@127.0.0.1:55433/map_service",
-)
+from app.db.session import SessionLocal  # noqa: E402
+from app.models.catalog import BeverageItem  # noqa: E402
+from app.services.map_snapshot_import import MapSnapshotImportService  # noqa: E402
+from app.services.map_snapshot_sync import parse_map_snapshot_event_page  # noqa: E402
 
-# Canonical liquor_shop place_ids from map-service (visibility='visible')
-# Maps place_id → list of beverage_item canonical_name_en to stock
-LIQUOR_SHOP_INVENTORY: dict[str, list[str]] = {
-    "86633237-8df0-5a5d-ac9a-ab4f91a35fff": [  # 더몰트샵
-        "The Macallan 12 Years Double Cask",
-        "Glenfiddich 12 Year Old",
-        "Laphroaig 10 Year Old",
-        "Buffalo Trace Bourbon",
-        "Jameson Irish Whiskey",
-    ],
-}
-
-_VENUE_NS = uuid.UUID("a1b2c3d4-e5f6-7890-abcd-ef1234567890")
-_INV_NS   = uuid.UUID("b2c3d4e5-f6a7-8901-bcde-f01234567891")
+DEFAULT_FIXTURE = Path("data/map/venue_inventory_seed_events.json")
 
 
-def _stable(namespace: uuid.UUID, *parts: str) -> uuid.UUID:
-    return uuid.uuid5(namespace, ":".join(parts))
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--fixture", type=Path, default=DEFAULT_FIXTURE)
+    args = parser.parse_args()
 
-
-def _fetch_liquor_shops() -> list[dict]:
-    with psycopg.connect(MAP_DB_URL, row_factory=dict_row) as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT
-                    id::text            AS place_id,
-                    label               AS name,
-                    layer_code          AS place_type,
-                    COALESCE(
-                        filter_json->>'road_address',
-                        filter_json->>'address',
-                        ''
-                    )                   AS address,
-                    published_revision::text AS place_revision
-                FROM map_view.markers
-                WHERE visibility = 'visible'
-                  AND layer_code  = 'liquor_shop'
-            """)
-            return cur.fetchall()
-
-
-def seed(session: Session) -> None:
-    # Build beverage name → id index
-    beverage_index: dict[str, uuid.UUID] = {
-        row.name_en: row.id
-        for row in session.scalars(select(BeverageItem).where(BeverageItem.active == True))  # noqa: E712
-    }
-
-    shops = _fetch_liquor_shops()
-    print(f"Found {len(shops)} liquor_shop marker(s) in map-service")
-
-    now = datetime.now(UTC)
-    stale_after = now + timedelta(days=7)
-
-    for shop in shops:
-        place_id = shop["place_id"]
-        place_revision = shop["place_revision"] or "seed_v1"
-
-        # --- VenueSnapshot ---
-        venue_id = _stable(_VENUE_NS, place_id)
-        venue = VenueSnapshot(
-            id=venue_id,
-            place_id=place_id,
-            place_revision=place_revision,
-            name=shop["name"],
-            place_type=shop["place_type"],
-            address=shop["address"] or None,
-            status="active",
-            publication_status="published",
-            snapshot_json={"seeded_by": "seed_venue_inventory.py", "source": "map_service"},
-            source_event_id=f"seed:{place_id}",
-            synced_at=now,
-            stale_after=stale_after,
+    if not args.fixture.exists():
+        raise SystemExit(
+            "fixture file is required. Provide a map_snapshot_event_v1 page with "
+            f"--fixture <path>; default not found: {args.fixture}",
         )
-        session.merge(venue)
-        print(f"  venue: {shop['name']} ({place_id})")
 
-        # --- VenueInventorySnapshot ---
-        items = LIQUOR_SHOP_INVENTORY.get(place_id, [])
-        created = 0
-        for item_name in items:
-            bev_id = beverage_index.get(item_name)
-            if bev_id is None:
-                print(f"    [skip] '{item_name}' not found in beverage_items")
+    page = load_snapshot_page(args.fixture)
+    parsed = parse_map_snapshot_event_page(page)
+
+    with SessionLocal() as session:
+        importer = MapSnapshotImportService(session)
+        try:
+            events = [resolve_beverage_names(session, event) for event in parsed.events]
+            results = [importer.import_snapshot_event(event) for event in events]
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+
+    print(
+        "venue inventory fixture seed "
+        f"fixture={args.fixture} "
+        f"events={len(results)} "
+        f"venues_created={sum(1 for result in results if result.venue_created)} "
+        f"inventory_created={sum(result.inventory_created for result in results)} "
+        f"prices_created={sum(result.prices_created for result in results)}",
+    )
+    return 0
+
+
+def load_snapshot_page(path: Path) -> dict[str, Any]:
+    with path.open(encoding="utf-8") as handle:
+        payload = json.load(handle)
+    if not isinstance(payload, dict):
+        raise ValueError("snapshot fixture must contain one JSON object")
+    return payload
+
+
+def resolve_beverage_names(
+    session: Session,
+    event: dict[str, Any],
+) -> dict[str, Any]:
+    """Resolve fixture-only beverage names to canonical beverage_item_id values."""
+
+    resolved = deepcopy(event)
+    name_index = _beverage_name_index(session)
+    for lane in ("menus", "inventory", "prices"):
+        rows = resolved.get(lane, [])
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if not isinstance(row, dict) or row.get("beverage_item_id"):
                 continue
+            name = row.get("beverage_name_en") or row.get("canonical_name_en")
+            if not isinstance(name, str) or not name:
+                continue
+            beverage_id = name_index.get(name)
+            if beverage_id is None:
+                raise ValueError(f"active beverage not found for fixture name: {name}")
+            row["beverage_item_id"] = str(beverage_id)
+            row.setdefault("source_beverage_id", name)
+    return resolved
 
-            inv_id = _stable(_INV_NS, place_id, str(bev_id))
-            inv = VenueInventorySnapshot(
-                id=inv_id,
-                venue_snapshot_id=venue_id,
-                place_id=place_id,
-                beverage_item_id=bev_id,
-                source_beverage_id=str(bev_id),
-                inventory_revision="seed_v1",
-                availability_status="available",
-                confidence=0.85,
-                last_seen_at=now,
-                expires_at=stale_after,
-                synced_at=now,
-                snapshot_json={"seeded_by": "seed_venue_inventory.py"},
-            )
-            session.merge(inv)
-            created += 1
-            print(f"    + {item_name}")
 
-        print(f"    {created} inventory item(s) linked")
-
-    session.commit()
-    print("Done.")
+def _beverage_name_index(session: Session) -> dict[str, Any]:
+    rows = session.scalars(
+        select(BeverageItem).where(BeverageItem.active.is_(True)),
+    )
+    return {row.name_en: row.id for row in rows if row.name_en}
 
 
 if __name__ == "__main__":
-    with Session(engine) as s:
-        seed(s)
+    raise SystemExit(main())
