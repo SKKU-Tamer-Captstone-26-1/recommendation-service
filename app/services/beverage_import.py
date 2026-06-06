@@ -29,6 +29,7 @@ from app.models.versioning import VectorSchemaVersion
 SEED_VERSION = "canonical_beverage_seed_v1"
 SEED_NAMESPACE = uuid.UUID("6ad0a869-203c-56cb-95b9-c11a9416eb35")
 STAGING_NAMESPACE = uuid.UUID("2020c0be-0d4a-53b0-a6cd-37e85f7bffcf")
+PRICE_POLICY = "verified_krw_observations_not_live_truth"
 
 MVP_SEED_CANDIDATE_IDS: tuple[str, ...] = (
     "bev_cand_beer_guinness_draught",
@@ -249,6 +250,11 @@ def build_canonical_seed_records(
         flavor_profile_id = _stable_uuid("flavor_profile", catalog_key)
         dimensions = flavor["taste_v1_dimension_values"]
         dimension_confidence = _normalize_dimension_confidence(flavor)
+        price_observations = _price_observations_for_candidate(
+            artifacts.price_rows,
+            candidate_id,
+        )
+        price_summary = _price_observation_summary(price_observations)
         source_hash = _source_hash(
             {
                 "catalog": catalog,
@@ -271,6 +277,8 @@ def build_canonical_seed_records(
             knowledge,
             catalog_key,
             reason_hints,
+            price_observations,
+            price_summary,
         )
 
         beverage = BeverageItem(
@@ -282,8 +290,8 @@ def build_canonical_seed_records(
             country=catalog.get("country"),
             region=catalog.get("region"),
             abv=catalog.get("abv"),
-            price_min_krw=None,
-            price_max_krw=None,
+            price_min_krw=price_summary["price_min_krw"],
+            price_max_krw=price_summary["price_max_krw"],
             active=True,
             description=knowledge.get("summary_text"),
             search_document=None,
@@ -599,6 +607,8 @@ def _catalog_metadata(
     knowledge: dict[str, Any],
     catalog_key: str,
     reason_hints: list[str],
+    price_observations: list[dict[str, Any]],
+    price_summary: dict[str, Any],
 ) -> dict[str, Any]:
     return {
         "catalog_key": catalog_key,
@@ -618,7 +628,126 @@ def _catalog_metadata(
         "knowledge_source_url": knowledge.get("source_url"),
         "reason_code_hints": reason_hints,
         "extended_dimension_values": flavor.get("extended_dimension_values", {}),
-        "price_policy": "candidate_price_observations_not_live_truth",
+        "price_policy": PRICE_POLICY,
+        "price_observation_summary": price_summary,
+        "price_observations": price_observations,
+    }
+
+
+def _price_observations_for_candidate(
+    price_rows: dict[str, dict[str, Any]],
+    beverage_candidate_id: str,
+) -> list[dict[str, Any]]:
+    observations = [
+        _canonical_price_observation(row)
+        for row in price_rows.values()
+        if row.get("beverage_candidate_id") == beverage_candidate_id
+    ]
+    return sorted(
+        observations,
+        key=lambda row: (
+            str(row.get("observed_at") or ""),
+            str(row.get("price_observation_id") or ""),
+        ),
+    )
+
+
+def _canonical_price_observation(row: dict[str, Any]) -> dict[str, Any]:
+    if row.get("market_region") != "KR" or row.get("currency") != "KRW":
+        raise BeverageImportError(
+            "canonical beverage seed only accepts KR/KRW price observations",
+        )
+
+    price_min = _price_krw(row, "price_min", fallback_key="price_value")
+    price_max = _price_krw(row, "price_max", fallback_key="price_value")
+    price_value = _price_krw(row, "price_value")
+    if price_min > price_max:
+        raise BeverageImportError("price_min must be less than or equal to price_max")
+    if not price_min <= price_value <= price_max:
+        raise BeverageImportError("price_value must be within price_min and price_max")
+
+    observation = {
+        "price_observation_id": row["price_observation_id"],
+        "market_region": "KR",
+        "currency": "KRW",
+        "price_min_krw": price_min,
+        "price_max_krw": price_max,
+        "price_value_krw": price_value,
+        "price_type": row.get("price_type"),
+        "source_type": row.get("source_type"),
+        "source_url": row.get("source_url"),
+        "observed_at": row.get("observed_at"),
+        "retrieved_at": row.get("retrieved_at"),
+        "source_date_note": row.get("source_date_note"),
+        "notes": row.get("notes"),
+    }
+    confidence = row.get("confidence")
+    if isinstance(confidence, int | float):
+        observation["confidence"] = float(confidence)
+    return observation
+
+
+def _price_krw(
+    row: dict[str, Any],
+    key: str,
+    *,
+    fallback_key: str | None = None,
+) -> int:
+    value = row.get(key)
+    if value is None and fallback_key is not None:
+        value = row.get(fallback_key)
+    if not isinstance(value, int | float):
+        raise BeverageImportError(f"{key} must be numeric for canonical price import")
+    if value < 0:
+        raise BeverageImportError(f"{key} must be non-negative")
+    return int(round(float(value)))
+
+
+def _price_observation_summary(
+    observations: list[dict[str, Any]],
+) -> dict[str, Any]:
+    if not observations:
+        return {
+            "policy": PRICE_POLICY,
+            "market_region": "KR",
+            "currency": "KRW",
+            "observation_count": 0,
+            "price_min_krw": None,
+            "price_max_krw": None,
+            "observed_at_min": None,
+            "observed_at_max": None,
+            "retrieved_at_max": None,
+            "confidence_min": None,
+            "confidence_max": None,
+        }
+
+    observed_dates = [
+        row["observed_at"]
+        for row in observations
+        if isinstance(row.get("observed_at"), str)
+    ]
+    retrieved_dates = [
+        row["retrieved_at"]
+        for row in observations
+        if isinstance(row.get("retrieved_at"), str)
+    ]
+    confidence_values = [
+        row["confidence"]
+        for row in observations
+        if isinstance(row.get("confidence"), float)
+    ]
+    return {
+        "policy": PRICE_POLICY,
+        "market_region": "KR",
+        "currency": "KRW",
+        "observation_count": len(observations),
+        "price_min_krw": min(row["price_min_krw"] for row in observations),
+        "price_max_krw": max(row["price_max_krw"] for row in observations),
+        "observed_at_min": min(observed_dates) if observed_dates else None,
+        "observed_at_max": max(observed_dates) if observed_dates else None,
+        "retrieved_at_max": max(retrieved_dates) if retrieved_dates else None,
+        "confidence_min": min(confidence_values) if confidence_values else None,
+        "confidence_max": max(confidence_values) if confidence_values else None,
     }
 
 

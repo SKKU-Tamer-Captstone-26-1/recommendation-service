@@ -68,17 +68,22 @@ Found candidate validation tooling:
 | `recommendation_staging.beverage_price_observation_candidates` | implemented | Store KRW price observation raw JSON |
 | `recommendation_staging.beverage_source_refs` | implemented | Store source registry rows |
 
-## Canonical Table Non-Write Decision
+## Canonical Table Promotion Decision
 
-The full candidate batch must not be inserted into canonical tables.
+The full candidate batch must not be inserted into canonical beverage identity,
+flavor, or vector tables.
 
 Reason:
 
 - Most candidate records are not human-reviewed.
 - The dry-run validator only proves shape/linkage, not curation approval.
-- Candidate price observations are not live price truth.
 - Only the fixed MVP seed subset from `docs/plans/002.md` is eligible for
   canonical promotion.
+- Human-verified KR/KRW price observations for promoted seed beverages may be
+  copied into `beverage_items.price_min_krw`, `beverage_items.price_max_krw`,
+  and `metadata_json.price_observations`.
+- Candidate price observations are broad catalog evidence only. They are not
+  live venue price truth, inventory truth, or strict budget-filter evidence.
 
 ## Current Staging Behavior
 
@@ -92,6 +97,8 @@ The staging importer supports:
 - using the dry-run report before any staging write
 - promoting only the fixed reviewed MVP seed subset into canonical
   `beverage_items`, `flavor_profiles`, and `recommendation_vectors`
+- promoting human-verified KRW price observations for that fixed subset into
+  canonical beverage item price range fields and traceable metadata
 
 ## Dry-Run Report Status
 

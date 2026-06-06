@@ -356,6 +356,13 @@ class BeverageRecommendationService:
                         "source_version": candidate.beverage.metadata_json.get(
                             "source_version",
                         ),
+                        "price_min_krw": candidate.beverage.price_min_krw,
+                        "price_max_krw": candidate.beverage.price_max_krw,
+                        "price_observation_summary": (
+                            candidate.beverage.metadata_json.get(
+                                "price_observation_summary",
+                            )
+                        ),
                         "price_policy": candidate.beverage.metadata_json.get(
                             "price_policy",
                         ),

@@ -81,7 +81,7 @@ Required MVP fields:
 | `brand` | Optional. |
 | `country` / `region` | Optional provenance filters. |
 | `abv` | Optional alcohol percentage. |
-| `price_min_krw` / `price_max_krw` | Optional broad expected retail/drink range. Not venue price truth. |
+| `price_min_krw` / `price_max_krw` | Optional broad expected KR retail range from human-verified beverage price observations. Not venue price truth. |
 | `active` | Required serving flag. `false` excludes from recommendation candidates. |
 | `description` | Optional curated description. |
 | `metadata_json` | Required structured catalog metadata. |
@@ -97,12 +97,26 @@ Recommended `metadata_json` keys:
   "curation_status": "approved",
   "tags": ["bourbon", "vanilla", "caramel", "oak"],
   "serving_context": ["neat", "highball"],
-  "reason_code_hints": ["MATCHES_VANILLA_CARAMEL", "BEGINNER_FRIENDLY"]
+  "reason_code_hints": ["MATCHES_VANILLA_CARAMEL", "BEGINNER_FRIENDLY"],
+  "price_policy": "verified_krw_observations_not_live_truth",
+  "price_observation_summary": {
+    "market_region": "KR",
+    "currency": "KRW",
+    "observation_count": 1,
+    "price_min_krw": 39000,
+    "price_max_krw": 39000
+  }
 }
 ```
 
 For MVP, `active` is enough for active/inactive serving state. Add a richer
 status column later only when the product needs draft/review/archive workflow.
+
+`price_min_krw` and `price_max_krw` are allowed only as broad catalog price
+evidence after human review. They are useful for display, explanation, and weak
+budget context, but they MUST NOT be presented as a live offer, venue menu
+price, inventory truth, or strict budget-filter source. Live venue/menu prices
+remain owned by map-service/place-service snapshots.
 
 ## Beverage Taste Profile
 

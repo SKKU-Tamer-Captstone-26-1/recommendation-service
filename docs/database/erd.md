@@ -134,8 +134,11 @@ Rules:
 - Automated imports keep candidate status as `needs_review`.
 - Only a fixed reviewed seed subset may be promoted into canonical
   `beverage_items`, `flavor_profiles`, and `recommendation_vectors`.
-- Candidate KRW price observations are not live offers, inventory truth, or
-  strict budget-filter evidence.
+- Human-verified KRW price observations for the promoted seed subset may be
+  copied into `beverage_items.price_min_krw`, `beverage_items.price_max_krw`,
+  and `beverage_items.metadata_json.price_observations`.
+- Candidate KRW price observations remain broad catalog price evidence. They
+  are not live offers, venue inventory truth, or strict budget-filter evidence.
 
 ## ERD
 

@@ -82,6 +82,9 @@ Rules:
   `retrieved_at`.
 - Prefer official price lists or dated press references when available.
 - Retailers are allowed only as point-in-time rough observations.
+- After human review, KR/KRW observations may populate broad
+  `beverage_items.price_min_krw`, `beverage_items.price_max_krw`, and traceable
+  catalog metadata for promoted seed beverages.
 - Do not compare budgets strictly from these records.
 - Do not store venue/menu/live store prices as beverage catalog truth.
 

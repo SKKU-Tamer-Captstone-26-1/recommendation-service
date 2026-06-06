@@ -50,6 +50,8 @@ def main() -> int:
         "beverage catalog audit "
         f"source={report.source} "
         f"active_beverages={report.metrics['active_beverages']} "
+        f"priced_beverages={report.metrics['priced_beverages']} "
+        f"price_observations={report.metrics['price_observations']} "
         f"critical={report.critical_count} "
         f"warnings={report.warning_count} "
         f"report={args.report}",

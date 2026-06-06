@@ -507,6 +507,20 @@ def _metrics(
         if _has_value((beverage.metadata_json or {}).get("aliases_en"))
         or _has_value((beverage.metadata_json or {}).get("aliases_ko"))
     )
+    priced_beverage_count = sum(
+        1
+        for beverage in beverages
+        if beverage.price_min_krw is not None and beverage.price_max_krw is not None
+    )
+    price_observation_count = sum(
+        int(
+            ((beverage.metadata_json or {}).get("price_observation_summary") or {}).get(
+                "observation_count",
+                0,
+            ),
+        )
+        for beverage in beverages
+    )
     source_metadata_count = sum(
         1
         for vector in vectors
@@ -526,6 +540,8 @@ def _metrics(
     )
     return {
         "active_beverages": len(beverages),
+        "priced_beverages": priced_beverage_count,
+        "price_observations": price_observation_count,
         "recommendation_vectors": len(vectors),
         "flavor_profiles": len(flavor_profiles),
         "category_counts": dict(sorted(category_counts.items())),

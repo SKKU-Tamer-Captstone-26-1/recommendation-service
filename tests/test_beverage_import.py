@@ -41,7 +41,13 @@ def test_canonical_seed_subset_builds_reviewed_records() -> None:
         "wine": 5,
     }
     assert all(record.beverage.active for record in records)
-    assert all(record.beverage.price_min_krw is None for record in records)
+    priced_records = [
+        record for record in records if record.beverage.price_min_krw is not None
+    ]
+    assert len(priced_records) == 49
+    assert all(
+        record.beverage.price_max_krw is not None for record in priced_records
+    )
     assert all(record.beverage.metadata_json["aliases_en"] for record in records)
     assert all(record.beverage.metadata_json["aliases_ko"] for record in records)
     assert all(
@@ -60,6 +66,34 @@ def test_canonical_seed_subset_builds_reviewed_records() -> None:
         == {dimension.name for dimension in TASTE_V1_DIMENSIONS}
         for record in records
     )
+
+    buffalo_trace = next(
+        record
+        for record in records
+        if record.beverage.metadata_json["catalog_key"]
+        == "whiskey.buffalo_trace_bourbon"
+    )
+    assert buffalo_trace.beverage.price_min_krw == 39000
+    assert buffalo_trace.beverage.price_max_krw == 39000
+    assert buffalo_trace.beverage.metadata_json["price_policy"] == (
+        "verified_krw_observations_not_live_truth"
+    )
+    assert buffalo_trace.beverage.metadata_json["price_observation_summary"] == {
+        "confidence_max": 0.62,
+        "confidence_min": 0.62,
+        "currency": "KRW",
+        "market_region": "KR",
+        "observation_count": 1,
+        "observed_at_max": "2026-05-22",
+        "observed_at_min": "2026-05-22",
+        "policy": "verified_krw_observations_not_live_truth",
+        "price_max_krw": 39000,
+        "price_min_krw": 39000,
+        "retrieved_at_max": "2026-05-22",
+    }
+    assert buffalo_trace.beverage.metadata_json["price_observations"][0][
+        "price_observation_id"
+    ] == "price_obs_kr_whiskey_buffalo_trace_dailyshot_2026_05_22"
 
 
 def test_canonical_seed_ids_and_hashes_are_deterministic() -> None:
