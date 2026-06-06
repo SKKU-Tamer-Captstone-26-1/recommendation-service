@@ -1,0 +1,279 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ontheblock.example/schemas/chatbot-sft/recommendation_snapshot.schema.json",
+  "title": "Recommendation Snapshot For Chatbot SFT Authoring",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "snapshot_id",
+    "data_type",
+    "created_at",
+    "language",
+    "fixture_policy",
+    "source_policy",
+    "user_request",
+    "grounded_context",
+    "expected_assistant_behavior",
+    "human_review"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "chatbot_sft_snapshot_v1"
+    },
+    "snapshot_id": {
+      "type": "string",
+      "pattern": "^sft_snap_[a-z0-9_]+$"
+    },
+    "data_type": {
+      "type": "string",
+      "enum": [
+        "beverage_recommendation_explanation",
+        "venue_recommendation_explanation",
+        "tradeoff_explanation",
+        "profile_missing_insufficient_data",
+        "out_of_scope_refusal"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "language": {
+      "const": "ko"
+    },
+    "fixture_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "is_synthetic_fixture",
+        "is_training_example",
+        "human_review_required"
+      ],
+      "properties": {
+        "is_synthetic_fixture": {
+          "type": "boolean"
+        },
+        "is_training_example": {
+          "type": "boolean"
+        },
+        "human_review_required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "source_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowed_sources",
+        "disallowed_sources",
+        "pii_status",
+        "raw_data_policy",
+        "ranking_policy"
+      ],
+      "properties": {
+        "allowed_sources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "disallowed_sources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "pii_status": {
+          "type": "string",
+          "enum": [
+            "no_pii",
+            "hashed_user_ids_only",
+            "requires_privacy_review"
+          ]
+        },
+        "raw_data_policy": {
+          "type": "string"
+        },
+        "ranking_policy": {
+          "type": "string"
+        }
+      }
+    },
+    "user_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text_ko",
+        "intent",
+        "requires_location"
+      ],
+      "properties": {
+        "text_ko": {
+          "type": "string"
+        },
+        "intent": {
+          "type": "string"
+        },
+        "requires_location": {
+          "type": "boolean"
+        }
+      }
+    },
+    "grounded_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "recommendations",
+        "missing_facts",
+        "used_sources"
+      ],
+      "properties": {
+        "profile": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "recommendations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "type",
+              "rank",
+              "reason_codes",
+              "explanation"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "beverage",
+                  "venue",
+                  "purchase_option",
+                  "comparison"
+                ]
+              },
+              "rank": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "reason_codes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "explanation": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "missing_facts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "used_sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "source_type",
+              "source_service"
+            ],
+            "properties": {
+              "source_type": {
+                "type": "string"
+              },
+              "source_service": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "expected_assistant_behavior": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "answer_ko",
+        "refused",
+        "refusal_reason",
+        "must_include",
+        "must_not_include",
+        "preserve_recommendation_order",
+        "notes"
+      ],
+      "properties": {
+        "answer_ko": {
+          "type": "string"
+        },
+        "refused": {
+          "type": "boolean"
+        },
+        "refusal_reason": {
+          "type": "string"
+        },
+        "must_include": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "must_not_include": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "preserve_recommendation_order": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "human_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "reviewer",
+        "notes",
+        "risk_flags"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "approved_for_sft_authoring",
+            "rejected"
+          ]
+        },
+        "reviewer": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "risk_flags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

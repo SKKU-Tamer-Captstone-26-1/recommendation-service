@@ -58,6 +58,7 @@ gateway/auth context -> JWT sub -> external_user_id
 | `refusal_reason` | Typed refusal reason |
 | `cards` | Structured recommendation cards |
 | `used_sources` | Internal source metadata for traceability |
+| `warnings` | User-facing warnings or disclaimers |
 | `missing_facts` | Facts required but not available |
 | `follow_up_questions` | Optional clarifying questions |
 
@@ -192,6 +193,23 @@ comparison
 
 User-facing clients SHOULD NOT display raw internal IDs by default.
 
+## Warnings
+
+`warnings` contains user-facing caution text that the client may display near
+the assistant answer.
+
+When the assistant uses human-reviewed personal blogs, community posts, tasting
+reviews, or other empirical opinion summaries as explanation support, the
+response MUST include:
+
+```text
+이 추천은 사람들의 경험과 개인적 의견을 종합한 경험적 추천입니다. 개인차가 있을 수 있으므로 참고용으로만 확인해 주세요.
+```
+
+Empirical warnings do not make personal opinions canonical. They only explain
+that part of the natural-language recommendation is based on aggregated
+experience summaries.
+
 ## Missing Facts
 
 Examples:
@@ -218,6 +236,7 @@ freshness_metadata
   "refusal_reason": "",
   "cards": [],
   "used_sources": [],
+  "warnings": [],
   "missing_facts": [],
   "follow_up_questions": []
 }
@@ -234,6 +253,7 @@ freshness_metadata
   "refusal_reason": "",
   "cards": [],
   "used_sources": [],
+  "warnings": [],
   "missing_facts": ["confirmed_inventory"],
   "follow_up_questions": []
 }
@@ -250,6 +270,7 @@ freshness_metadata
   "refusal_reason": "no_recommendation_facts",
   "cards": [],
   "used_sources": [],
+  "warnings": [],
   "missing_facts": ["beverage_recommendations"],
   "follow_up_questions": []
 }
@@ -266,6 +287,7 @@ freshness_metadata
   "refusal_reason": "out_of_scope",
   "cards": [],
   "used_sources": [],
+  "warnings": [],
   "missing_facts": [],
   "follow_up_questions": []
 }

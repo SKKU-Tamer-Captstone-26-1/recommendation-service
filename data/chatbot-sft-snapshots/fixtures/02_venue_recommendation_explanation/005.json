@@ -1,0 +1,133 @@
+{
+  "schema_version": "chatbot_sft_snapshot_v1",
+  "snapshot_id": "sft_snap_venue_recommendation_explanation_005",
+  "data_type": "venue_recommendation_explanation",
+  "created_at": "2026-06-02T00:00:00+09:00",
+  "language": "ko",
+  "fixture_policy": {
+    "is_synthetic_fixture": true,
+    "is_training_example": false,
+    "human_review_required": true
+  },
+  "source_policy": {
+    "allowed_sources": [
+      "recommendation-service venue recommendation output",
+      "recommendation-service map/place read-model snapshot",
+      "recommendation-service reason codes"
+    ],
+    "disallowed_sources": [
+      "direct map database rows",
+      "Kakao response data outside approved policy",
+      "auth tokens",
+      "model memory"
+    ],
+    "pii_status": "no_pii",
+    "raw_data_policy": "Only synthetic recommendation read-model facts are present.",
+    "ranking_policy": "Assistant must preserve venue ranking and must not invent place facts."
+  },
+  "user_request": {
+    "text_ko": "스모키한 위스키 마실 수 있는 바 찾아줘.",
+    "intent": "find_nearby_venue",
+    "requires_location": true
+  },
+  "grounded_context": {
+    "profile": {
+      "status": "active",
+      "profile_revision": 35,
+      "summary_ko": "스모키하고 피트한 위스키를 선호합니다.",
+      "preferred_categories": [
+        "bar",
+        "pub"
+      ],
+      "budget": "30k_100k"
+    },
+    "recommendations": [
+      {
+        "type": "venue",
+        "rank": 1,
+        "place_id": "fixture_place_venue_005_001",
+        "name_en": "Fixture Peat Cellar",
+        "display_name_ko": "픽스처 피트 셀러",
+        "place_name": "Fixture Peat Cellar",
+        "place_type": "bar",
+        "distance_m": 980,
+        "atmosphere": "어둡고 집중해서 위스키를 마시기 좋은 분위기",
+        "menu": [
+          "피트 위스키",
+          "싱글몰트"
+        ],
+        "price_range": "30000-65000",
+        "availability_status": "likely_available",
+        "inventory_confidence": 0.77,
+        "price_confidence": 0.78,
+        "reason_codes": [
+          "MATCHES_SMOKY_PROFILE",
+          "SELECTED_BEVERAGE_AVAILABLE"
+        ],
+        "explanation": "스모키한 위스키 메뉴와 집중도 높은 분위기가 잘 맞습니다."
+      },
+      {
+        "type": "venue",
+        "rank": 2,
+        "place_id": "fixture_place_venue_005_002",
+        "name_en": "Fixture Smoke Pub",
+        "display_name_ko": "픽스처 스모크 펍",
+        "place_name": "Fixture Smoke Pub",
+        "place_type": "pub",
+        "distance_m": 640,
+        "atmosphere": "캐주얼하고 활기찬 펍 분위기",
+        "menu": [
+          "피트 하이볼",
+          "라거"
+        ],
+        "price_range": "18000-35000",
+        "availability_status": "likely_available",
+        "inventory_confidence": 0.8,
+        "price_confidence": 0.78,
+        "reason_codes": [
+          "MATCHES_SMOKY_PROFILE",
+          "NEARBY_VENUE"
+        ],
+        "explanation": "더 가까운 스모키 계열 대안입니다."
+      }
+    ],
+    "missing_facts": [],
+    "used_sources": [
+      {
+        "source_type": "venue_recommendation",
+        "source_service": "recommendation-service",
+        "request_id": "fixture_rec_req_venue_recommendation_005",
+        "result_id": "fixture_rec_result_venue_recommendation_005",
+        "scoring_config_version": "fixture_scoring_v1",
+        "profile_revision": 35
+      }
+    ]
+  },
+  "expected_assistant_behavior": {
+    "answer_ko": "스모키한 위스키 자체에 집중하려면 Fixture Peat Cellar가 1순위입니다. 980m로 더 멀지만 피트 위스키 메뉴와 어둡고 집중하기 좋은 분위기가 맞습니다. 더 가까운 대안은 640m 거리의 Fixture Smoke Pub입니다.",
+    "refused": false,
+    "refusal_reason": "",
+    "must_include": [
+      "Fixture Peat Cellar",
+      "피트 위스키",
+      "980m",
+      "Fixture Smoke Pub",
+      "640m"
+    ],
+    "must_not_include": [
+      "새로운 장소 이름",
+      "영업 중 확정",
+      "실시간 재고 확정",
+      "도보 시간",
+      "추천 순서 변경"
+    ],
+    "preserve_recommendation_order": true,
+    "notes": "Expected answer must preserve venue ranking and avoid live availability claims."
+  },
+  "human_review": {
+    "status": "draft",
+    "reviewer": "",
+    "notes": "Synthetic venue recommendation fixture for manual review.",
+    "risk_flags": []
+  }
+}

@@ -1,0 +1,132 @@
+{
+  "schema_version": "chatbot_sft_snapshot_v1",
+  "snapshot_id": "sft_snap_venue_recommendation_explanation_003",
+  "data_type": "venue_recommendation_explanation",
+  "created_at": "2026-06-02T00:00:00+09:00",
+  "language": "ko",
+  "fixture_policy": {
+    "is_synthetic_fixture": true,
+    "is_training_example": false,
+    "human_review_required": true
+  },
+  "source_policy": {
+    "allowed_sources": [
+      "recommendation-service venue recommendation output",
+      "recommendation-service map/place read-model snapshot",
+      "recommendation-service reason codes"
+    ],
+    "disallowed_sources": [
+      "direct map database rows",
+      "Kakao response data outside approved policy",
+      "auth tokens",
+      "model memory"
+    ],
+    "pii_status": "no_pii",
+    "raw_data_policy": "Only synthetic recommendation read-model facts are present.",
+    "ranking_policy": "Assistant must preserve venue ranking and must not invent place facts."
+  },
+  "user_request": {
+    "text_ko": "맥주 마시기 편한 펍 추천해줘.",
+    "intent": "find_nearby_venue",
+    "requires_location": true
+  },
+  "grounded_context": {
+    "profile": {
+      "status": "active",
+      "profile_revision": 33,
+      "summary_ko": "가볍고 쓴맛이 강하지 않은 맥주와 편한 분위기를 선호합니다.",
+      "preferred_categories": [
+        "bar",
+        "pub"
+      ],
+      "budget": "30k_100k"
+    },
+    "recommendations": [
+      {
+        "type": "venue",
+        "rank": 1,
+        "place_id": "fixture_place_venue_003_001",
+        "name_en": "Fixture Easy Pub",
+        "display_name_ko": "픽스처 이지 펍",
+        "place_name": "Fixture Easy Pub",
+        "place_type": "pub",
+        "distance_m": 310,
+        "atmosphere": "편하고 활기 있지만 대화 가능한 분위기",
+        "menu": [
+          "라거",
+          "위트비어"
+        ],
+        "price_range": "9000-18000",
+        "availability_status": "likely_available",
+        "inventory_confidence": 0.77,
+        "price_confidence": 0.78,
+        "reason_codes": [
+          "NEARBY_VENUE",
+          "BEGINNER_FRIENDLY"
+        ],
+        "explanation": "가까운 거리와 부담 없는 맥주 메뉴가 잘 맞습니다."
+      },
+      {
+        "type": "venue",
+        "rank": 2,
+        "place_id": "fixture_place_venue_003_002",
+        "name_en": "Fixture Malt House",
+        "display_name_ko": "픽스처 몰트 하우스",
+        "place_name": "Fixture Malt House",
+        "place_type": "pub",
+        "distance_m": 690,
+        "atmosphere": "맥주 종류가 많은 캐주얼 펍 분위기",
+        "menu": [
+          "페일에일",
+          "스타우트"
+        ],
+        "price_range": "11000-22000",
+        "availability_status": "likely_available",
+        "inventory_confidence": 0.8,
+        "price_confidence": 0.78,
+        "reason_codes": [
+          "ADJACENT_DISCOVERY",
+          "NEARBY_VENUE"
+        ],
+        "explanation": "맥주 종류를 더 탐색하고 싶을 때 볼 수 있습니다."
+      }
+    ],
+    "missing_facts": [],
+    "used_sources": [
+      {
+        "source_type": "venue_recommendation",
+        "source_service": "recommendation-service",
+        "request_id": "fixture_rec_req_venue_recommendation_003",
+        "result_id": "fixture_rec_result_venue_recommendation_003",
+        "scoring_config_version": "fixture_scoring_v1",
+        "profile_revision": 33
+      }
+    ]
+  },
+  "expected_assistant_behavior": {
+    "answer_ko": "맥주를 편하게 마시려면 Fixture Easy Pub이 먼저입니다. 310m 거리이고 라거와 위트비어처럼 부담 없는 메뉴가 있어요. 더 다양한 맥주를 보고 싶다면 690m 거리의 Fixture Malt House가 두 번째 후보입니다.",
+    "refused": false,
+    "refusal_reason": "",
+    "must_include": [
+      "Fixture Easy Pub",
+      "310m",
+      "라거",
+      "Fixture Malt House"
+    ],
+    "must_not_include": [
+      "새로운 장소 이름",
+      "영업 중 확정",
+      "실시간 재고 확정",
+      "도보 시간",
+      "추천 순서 변경"
+    ],
+    "preserve_recommendation_order": true,
+    "notes": "Expected answer must preserve venue ranking and avoid live availability claims."
+  },
+  "human_review": {
+    "status": "draft",
+    "reviewer": "",
+    "notes": "Synthetic venue recommendation fixture for manual review.",
+    "risk_flags": []
+  }
+}

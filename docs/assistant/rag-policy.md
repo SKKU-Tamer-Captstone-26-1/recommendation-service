@@ -33,6 +33,7 @@ The assistant MAY answer from these verified facts:
 | Reason codes | `recommendation-service` | Generate deterministic explanations |
 | Map/place read-model snapshots | `recommendation-service` | Explain place, price, inventory, distance facts |
 | Freshness and confidence metadata | `recommendation-service` | Warn about stale or uncertain facts |
+| Human-reviewed empirical review summaries | Approved content curation pipeline | Explain common user experience patterns only |
 | App policy documents | Repository docs or policy service | Refusal and scope behavior |
 
 ## Disallowed Sources
@@ -57,6 +58,39 @@ The assistant MUST NOT treat RAG chunks as source of truth for:
 - opening hours
 - recommendation score
 - place existence
+
+## Personal Opinion / Empirical Review Policy
+
+Personal blogs, community posts, and tasting reviews MAY be used only after
+human review and source-policy approval.
+
+Allowed use:
+
+- summarize repeated experience patterns, such as "many reviewers describe this
+  as sweet, smoky, or beginner-friendly"
+- enrich recommendation explanations after `recommendation-service` has already
+  produced deterministic candidates and ranking
+- preserve source metadata for internal audit
+- paraphrase; do not copy long source text into prompts or answers
+
+Forbidden use:
+
+- use personal opinions as recommendation score, rank, inventory, price,
+  location, opening-hour, or availability truth
+- use a single person's opinion as if it is objective product fact
+- scrape or store personal blog content without licensing, permission, or an
+  approved content policy
+- expose private author information, comments, or user identifiers
+
+If an answer uses empirical review summaries, the user-facing response MUST show
+this Korean warning:
+
+```text
+이 추천은 사람들의 경험과 개인적 의견을 종합한 경험적 추천입니다. 개인차가 있을 수 있으므로 참고용으로만 확인해 주세요.
+```
+
+If the assistant cannot preserve this warning with the answer, it MUST avoid
+using personal-opinion context.
 
 ## Grounded Context Requirements
 

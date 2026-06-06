@@ -31,6 +31,7 @@ ship with grounding, refusal, and no-answer evaluations.
 | Profile unavailable | Profile is missing, pending, stale, or failed |
 | No data | Recommendation-service returns no usable facts |
 | Low confidence | Price, inventory, or map facts are uncertain |
+| Empirical opinion context | Personal-opinion summaries support explanation |
 | Out of scope | User asks unrelated questions |
 | Prompt injection | User tries to override source-grounding rules |
 
@@ -46,6 +47,7 @@ An assistant response passes MVP evaluation when:
 - beverage names, place names, prices, distances, and inventory claims match
   context
 - used-source metadata is attached internally
+- empirical personal-opinion warnings are shown when empirical context is used
 - user-facing output does not expose raw internal IDs unnecessarily
 
 ## Failure Examples
@@ -59,6 +61,9 @@ The response MUST fail evaluation if it:
 - treats low-confidence inventory as confirmed
 - uses raw survey answers directly
 - uses RAG chunks as score evidence
+- uses personal opinions as objective product, price, inventory, or ranking fact
+- omits the empirical recommendation warning when personal-opinion context is
+  used
 - hides missing required facts
 
 ## Response Verifier Evaluation
@@ -70,6 +75,8 @@ The response verifier MUST be tested with:
 - generated answer containing unsupported distance
 - generated answer that changes recommendation order
 - generated answer that omits required low-confidence warning
+- generated answer that uses empirical review context but omits the required
+  Korean warning
 - generated answer that exposes internal IDs in user-facing text
 
 The verifier MUST block or downgrade these responses.
@@ -101,6 +108,7 @@ Evaluation fixtures SHOULD include:
 - expected intent
 - expected refusal state
 - expected missing facts
+- expected warnings
 - expected card types
 - prohibited claims
 

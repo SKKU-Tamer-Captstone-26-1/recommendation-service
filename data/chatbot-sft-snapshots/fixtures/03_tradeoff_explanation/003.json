@@ -1,0 +1,123 @@
+{
+  "schema_version": "chatbot_sft_snapshot_v1",
+  "snapshot_id": "sft_snap_tradeoff_explanation_003",
+  "data_type": "tradeoff_explanation",
+  "created_at": "2026-06-02T00:00:00+09:00",
+  "language": "ko",
+  "fixture_policy": {
+    "is_synthetic_fixture": true,
+    "is_training_example": false,
+    "human_review_required": true
+  },
+  "source_policy": {
+    "allowed_sources": [
+      "recommendation-service purchase option output",
+      "recommendation-service venue snapshot metadata",
+      "recommendation-service price and distance facts"
+    ],
+    "disallowed_sources": [
+      "direct map database rows",
+      "unverified live inventory",
+      "route time from model memory",
+      "new price estimates"
+    ],
+    "pii_status": "no_pii",
+    "raw_data_policy": "Only synthetic recommendation snapshot facts are present.",
+    "ranking_policy": "Assistant may compare trade-offs but must not create new option labels or reorder ranked options."
+  },
+  "user_request": {
+    "text_ko": "비슷한 가격이면 분위기 차이를 설명해줘.",
+    "intent": "compare_purchase_options",
+    "requires_location": true
+  },
+  "grounded_context": {
+    "profile": {
+      "status": "active",
+      "profile_revision": 43,
+      "summary_ko": "가격, 거리, 분위기를 함께 비교하려는 사용자입니다.",
+      "preferred_categories": [
+        "whiskey",
+        "bar"
+      ],
+      "budget": "30k_100k"
+    },
+    "recommendations": [
+      {
+        "type": "purchase_option",
+        "rank": 1,
+        "option_type": "balanced_best",
+        "tradeoff_type": "similar_price_different_atmosphere",
+        "place_id": "fixture_place_trade_003_001",
+        "place_name": "Fixture Quiet Bar",
+        "beverage_name": "Fixture Bourbon Whiskey",
+        "distance_m": 550,
+        "price_krw": 42000,
+        "atmosphere": "조용하고 어두운 분위기",
+        "availability_status": "likely_available",
+        "inventory_confidence": 0.84,
+        "price_confidence": 0.84,
+        "reason_codes": [
+          "BALANCED_BEST",
+          "WITHIN_BUDGET"
+        ],
+        "explanation": "가격은 비슷하지만 더 차분한 분위기입니다."
+      },
+      {
+        "type": "purchase_option",
+        "rank": 2,
+        "option_type": "nearest_reasonable",
+        "tradeoff_type": "similar_price_different_atmosphere",
+        "place_id": "fixture_place_trade_003_002",
+        "place_name": "Fixture Social Pub",
+        "beverage_name": "Fixture Bourbon Whiskey",
+        "distance_m": 500,
+        "price_krw": 43000,
+        "atmosphere": "밝고 대화가 많은 분위기",
+        "availability_status": "likely_available",
+        "inventory_confidence": 0.83,
+        "price_confidence": 0.83,
+        "reason_codes": [
+          "NEAREST_REASONABLE",
+          "WITHIN_BUDGET"
+        ],
+        "explanation": "가격은 비슷하지만 더 활기찬 분위기입니다."
+      }
+    ],
+    "missing_facts": [],
+    "used_sources": [
+      {
+        "source_type": "purchase_option_recommendation",
+        "source_service": "recommendation-service",
+        "request_id": "fixture_rec_req_purchase_option_recommendation_003",
+        "result_id": "fixture_rec_result_purchase_option_recommendation_003",
+        "scoring_config_version": "fixture_scoring_v1",
+        "profile_revision": 43
+      }
+    ]
+  },
+  "expected_assistant_behavior": {
+    "answer_ko": "두 후보는 가격이 비슷합니다. Fixture Quiet Bar는 42,000원이고 조용하고 어두운 분위기라 차분한 선택에 가깝습니다. Fixture Social Pub은 43,000원이고 더 밝고 활기찬 분위기입니다.",
+    "refused": false,
+    "refusal_reason": "",
+    "must_include": [
+      "Fixture Quiet Bar",
+      "550",
+      "42,000원",
+      "Fixture Social Pub"
+    ],
+    "must_not_include": [
+      "새로운 장소",
+      "새로운 가격",
+      "도보 시간",
+      "실시간 재고 확정"
+    ],
+    "preserve_recommendation_order": true,
+    "notes": "Expected answer must disclose uncertainty when confidence or freshness is weak."
+  },
+  "human_review": {
+    "status": "draft",
+    "reviewer": "",
+    "notes": "Synthetic trade-off fixture for manual review.",
+    "risk_flags": []
+  }
+}

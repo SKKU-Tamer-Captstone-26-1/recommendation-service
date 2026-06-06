@@ -21,6 +21,8 @@ The assistant prompt must force the model to:
 - avoid inventing facts
 - preserve recommendation-service ranking and reason codes
 - communicate uncertainty when data is stale, missing, or low-confidence
+- include the required Korean warning when empirical personal-opinion context is
+  used
 
 ## Required Prompt Sections
 
@@ -104,12 +106,26 @@ Example:
   "missing_facts": [],
   "source_policy": {
     "answer_only_from_context": true,
-    "no_answer_if_missing": true
+    "no_answer_if_missing": true,
+    "uses_empirical_personal_opinion": false,
+    "empirical_warning_ko": ""
   }
 }
 ```
 
 The assistant MUST NOT pass raw survey answers to the LLM.
+
+When `source_policy.uses_empirical_personal_opinion` is `true`, the response
+MUST include this Korean warning exactly once:
+
+```text
+이 추천은 사람들의 경험과 개인적 의견을 종합한 경험적 추천입니다. 개인차가 있을 수 있으므로 참고용으로만 확인해 주세요.
+```
+
+The prompt MUST tell the model that empirical personal-opinion context is
+secondary explanation support only. It MUST NOT change the ranking, invent new
+candidates, or turn reviewer opinions into objective price, stock, distance, or
+place facts.
 
 ## Output Requirements
 
@@ -120,6 +136,7 @@ The response should contain:
 - concise answer
 - intent
 - refusal state
+- warnings or disclaimers when empirical personal-opinion context is used
 - missing facts when any
 - optional follow-up question
 

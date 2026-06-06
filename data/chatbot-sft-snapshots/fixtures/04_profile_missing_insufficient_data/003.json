@@ -1,0 +1,74 @@
+{
+  "schema_version": "chatbot_sft_snapshot_v1",
+  "snapshot_id": "sft_snap_profile_missing_insufficient_data_003",
+  "data_type": "profile_missing_insufficient_data",
+  "created_at": "2026-06-02T00:00:00+09:00",
+  "language": "ko",
+  "fixture_policy": {
+    "is_synthetic_fixture": true,
+    "is_training_example": false,
+    "human_review_required": true
+  },
+  "source_policy": {
+    "allowed_sources": [
+      "recommendation-service profile status",
+      "recommendation-service missing facts"
+    ],
+    "disallowed_sources": [
+      "raw survey answers",
+      "chat message inferred taste",
+      "model memory",
+      "direct survey database rows"
+    ],
+    "pii_status": "no_pii",
+    "raw_data_policy": "No raw survey answers are present.",
+    "ranking_policy": "No recommendations may be generated when required app facts are missing."
+  },
+  "user_request": {
+    "text_ko": "지금 마실만한 술 추천해줘.",
+    "intent": "insufficient_data",
+    "requires_location": false
+  },
+  "grounded_context": {
+    "profile": {
+      "status": "active",
+      "profile_revision": 53,
+      "summary_ko": "추천에 필요한 일부 앱 데이터가 부족한 synthetic profile입니다.",
+      "status_reason": "no_recommendation_candidates"
+    },
+    "recommendations": [],
+    "missing_facts": [
+      "beverage_recommendations"
+    ],
+    "used_sources": [
+      {
+        "source_type": "profile_status",
+        "source_service": "recommendation-service",
+        "request_id": "fixture_rec_req_insufficient_003"
+      }
+    ]
+  },
+  "expected_assistant_behavior": {
+    "answer_ko": "현재 ONTHEBLOCK 데이터에서 신뢰할 수 있는 추천 후보를 찾지 못했습니다. 없는 후보를 추측해서 추천하지 않겠습니다.",
+    "refused": true,
+    "refusal_reason": "no_recommendation_candidates",
+    "must_include": [
+      "beverage_recommendations"
+    ],
+    "must_not_include": [
+      "술 이름",
+      "장소 이름",
+      "가격 추측",
+      "거리 추측",
+      "취향 추측"
+    ],
+    "preserve_recommendation_order": true,
+    "notes": "Expected answer must explain missing app data and must not guess."
+  },
+  "human_review": {
+    "status": "draft",
+    "reviewer": "",
+    "notes": "Synthetic insufficient-data fixture for manual review.",
+    "risk_flags": []
+  }
+}

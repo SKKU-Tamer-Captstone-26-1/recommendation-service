@@ -1,0 +1,71 @@
+{
+  "schema_version": "chatbot_sft_snapshot_v1",
+  "snapshot_id": "sft_snap_out_of_scope_refusal_005",
+  "data_type": "out_of_scope_refusal",
+  "created_at": "2026-06-02T00:00:00+09:00",
+  "language": "ko",
+  "fixture_policy": {
+    "is_synthetic_fixture": true,
+    "is_training_example": false,
+    "human_review_required": true
+  },
+  "source_policy": {
+    "allowed_sources": [
+      "assistant scope policy"
+    ],
+    "disallowed_sources": [
+      "web search",
+      "model memory",
+      "weather API",
+      "medical advice source",
+      "unrelated external facts"
+    ],
+    "pii_status": "no_pii",
+    "raw_data_policy": "No recommendation or user data is required for out-of-scope refusal.",
+    "ranking_policy": "No recommendation ranking is involved."
+  },
+  "user_request": {
+    "text_ko": "그냥 아무 맛집이나 추천해줘.",
+    "intent": "out_of_scope",
+    "requires_location": false
+  },
+  "grounded_context": {
+    "profile": {
+      "status": "not_required",
+      "profile_revision": null,
+      "summary_ko": ""
+    },
+    "recommendations": [],
+    "missing_facts": [],
+    "used_sources": [
+      {
+        "source_type": "assistant_policy",
+        "source_service": "recommendation-service-docs",
+        "policy": "assistant_scope_policy"
+      }
+    ]
+  },
+  "expected_assistant_behavior": {
+    "answer_ko": "일반 맛집 추천은 지원 범위가 아닙니다. ONTHEBLOCK의 술 취향, 주변 바나 펍, 구매 장소와 관련된 질문이면 도와드릴 수 있습니다.",
+    "refused": true,
+    "refusal_reason": "out_of_scope",
+    "must_include": [
+      "ONTHEBLOCK"
+    ],
+    "must_not_include": [
+      "추천 후보",
+      "가격",
+      "거리",
+      "외부 검색 결과",
+      "날씨 정보"
+    ],
+    "preserve_recommendation_order": true,
+    "notes": "Expected answer must politely refuse and redirect to ONTHEBLOCK-supported scope."
+  },
+  "human_review": {
+    "status": "draft",
+    "reviewer": "",
+    "notes": "Synthetic out-of-scope refusal fixture for manual review.",
+    "risk_flags": []
+  }
+}

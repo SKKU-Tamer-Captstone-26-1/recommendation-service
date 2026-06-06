@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ontheblock.example/schemas/chatbot-sft/sft_candidate.schema.json",
+  "title": "Human Authored Chatbot SFT Candidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "candidate_id",
+    "source_snapshot_id",
+    "data_type",
+    "messages",
+    "grounding_review",
+    "split"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "chatbot_sft_candidate_v1"
+    },
+    "candidate_id": {
+      "type": "string"
+    },
+    "source_snapshot_id": {
+      "type": "string"
+    },
+    "data_type": {
+      "type": "string",
+      "enum": [
+        "beverage_recommendation_explanation",
+        "venue_recommendation_explanation",
+        "tradeoff_explanation",
+        "profile_missing_insufficient_data",
+        "out_of_scope_refusal"
+      ]
+    },
+    "messages": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "content"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "system",
+              "user",
+              "assistant"
+            ]
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "grounding_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "facts_match_context",
+        "ranking_preserved",
+        "no_new_prices_or_distances",
+        "no_new_places_or_beverages",
+        "refusal_correct_when_required",
+        "reviewer_notes"
+      ],
+      "properties": {
+        "facts_match_context": {
+          "type": "boolean"
+        },
+        "ranking_preserved": {
+          "type": "boolean"
+        },
+        "no_new_prices_or_distances": {
+          "type": "boolean"
+        },
+        "no_new_places_or_beverages": {
+          "type": "boolean"
+        },
+        "refusal_correct_when_required": {
+          "type": "boolean"
+        },
+        "reviewer_notes": {
+          "type": "string"
+        }
+      }
+    },
+    "split": {
+      "type": "string",
+      "enum": [
+        "train",
+        "eval",
+        "holdout"
+      ]
+    }
+  }
+}

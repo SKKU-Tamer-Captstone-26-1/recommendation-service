@@ -1,0 +1,123 @@
+{
+  "schema_version": "chatbot_sft_snapshot_v1",
+  "snapshot_id": "sft_snap_beverage_recommendation_explanation_005",
+  "data_type": "beverage_recommendation_explanation",
+  "created_at": "2026-06-02T00:00:00+09:00",
+  "language": "ko",
+  "fixture_policy": {
+    "is_synthetic_fixture": true,
+    "is_training_example": false,
+    "human_review_required": true
+  },
+  "source_policy": {
+    "allowed_sources": [
+      "recommendation-service beverage recommendation output",
+      "recommendation-service derived profile summary",
+      "recommendation-service reason codes"
+    ],
+    "disallowed_sources": [
+      "raw survey answers",
+      "auth tokens",
+      "direct survey database rows",
+      "direct map database rows",
+      "model memory"
+    ],
+    "pii_status": "no_pii",
+    "raw_data_policy": "No raw survey answers, auth tokens, or cross-service DB rows are present.",
+    "ranking_policy": "Assistant must preserve recommendation-service beverage ranking and must not rerank."
+  },
+  "user_request": {
+    "text_ko": "디저트랑 같이 마실만한 달콤한 술 추천해줘.",
+    "intent": "recommend_beverage",
+    "requires_location": false
+  },
+  "grounded_context": {
+    "profile": {
+      "status": "active",
+      "profile_revision": 25,
+      "summary_ko": "달콤하고 크리미한 풍미를 선호하며 디저트와 어울리는 술을 선호합니다.",
+      "preferred_categories": [
+        "cocktail",
+        "liqueur"
+      ],
+      "budget": "30k_100k"
+    },
+    "recommendations": [
+      {
+        "type": "beverage",
+        "rank": 1,
+        "beverage_id": "fixture_bev_005_001",
+        "name_en": "Baileys Original Irish Cream",
+        "display_name_ko": "베일리스 오리지널 아이리시 크림",
+        "canonical_name": "Baileys Original Irish Cream",
+        "category": "liqueur",
+        "style": "cream_liqueur",
+        "flavor_tags": [
+          "dessert_cream",
+          "vanilla_caramel"
+        ],
+        "reason_codes": [
+          "MATCHES_DESSERT_CREAM",
+          "MATCHES_VANILLA_CARAMEL"
+        ],
+        "explanation": "달콤하고 크리미한 풍미와 디저트 선호가 잘 맞습니다."
+      },
+      {
+        "type": "beverage",
+        "rank": 2,
+        "beverage_id": "fixture_bev_005_002",
+        "name_en": "Fixture Dessert Cream Cocktail",
+        "display_name_ko": "픽스처 디저트 크림 칵테일",
+        "canonical_name": "Fixture Dessert Cream Cocktail",
+        "category": "cocktail",
+        "style": "dessert_cocktail",
+        "flavor_tags": [
+          "dessert_cream",
+          "sweet"
+        ],
+        "reason_codes": [
+          "MATCHES_DESSERT_CREAM",
+          "BEGINNER_FRIENDLY"
+        ],
+        "explanation": "디저트와 함께 마시기 쉬운 부드러운 후보입니다."
+      }
+    ],
+    "missing_facts": [],
+    "used_sources": [
+      {
+        "source_type": "beverage_recommendation",
+        "source_service": "recommendation-service",
+        "request_id": "fixture_rec_req_beverage_recommendation_005",
+        "result_id": "fixture_rec_result_beverage_recommendation_005",
+        "scoring_config_version": "fixture_scoring_v1",
+        "profile_revision": 25
+      }
+    ]
+  },
+  "expected_assistant_behavior": {
+    "answer_ko": "디저트와 함께라면 Baileys Original Irish Cream이 가장 잘 맞습니다. 달콤하고 크리미한 풍미와 디저트 선호가 직접 연결됩니다. 더 칵테일다운 선택지를 원하면 Fixture Dessert Cream Cocktail이 두 번째 후보입니다.",
+    "refused": false,
+    "refusal_reason": "",
+    "must_include": [
+      "Baileys Original Irish Cream",
+      "달콤",
+      "크리미",
+      "Fixture Dessert Cream Cocktail"
+    ],
+    "must_not_include": [
+      "새로운 술 이름",
+      "장소 이름",
+      "가격",
+      "거리",
+      "추천 순서 변경"
+    ],
+    "preserve_recommendation_order": true,
+    "notes": "Expected answer must preserve beverage ranking and only paraphrase grounded reasons."
+  },
+  "human_review": {
+    "status": "draft",
+    "reviewer": "",
+    "notes": "Synthetic beverage recommendation fixture for manual review.",
+    "risk_flags": []
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "package_schema_version": "chatbot_sft_snapshot_package_v1",
+  "package_id": "chatbot_sft_snapshots_example_2026_06_02",
+  "created_at": "2026-06-02T00:00:00+09:00",
+  "created_by": "human_or_codex",
+  "purpose": "Prepare safe recommendation-service snapshots for future Korean chatbot SFT authoring.",
+  "is_training_dataset": false,
+  "contains_real_user_data": false,
+  "contains_secrets": false,
+  "contains_raw_survey_answers": false,
+  "contains_cross_service_db_rows": false,
+  "source_policy": {
+    "allowed_sources": [
+      "recommendation-service outputs",
+      "recommendation-service read-model snapshots",
+      "synthetic fixture facts"
+    ],
+    "disallowed_sources": [
+      "raw auth-service database rows",
+      "raw survey-service database rows",
+      "raw map-service database rows",
+      "raw JWT",
+      "access tokens",
+      "passwords",
+      "unverified external facts"
+    ]
+  },
+  "required_fixture_types": [
+    "beverage_recommendation_explanation",
+    "venue_recommendation_explanation",
+    "tradeoff_explanation",
+    "profile_missing_insufficient_data",
+    "out_of_scope_refusal"
+  ],
+  "required_minimum_counts": {
+    "beverage_recommendation_explanation": 5,
+    "venue_recommendation_explanation": 5,
+    "tradeoff_explanation": 5,
+    "profile_missing_insufficient_data": 5,
+    "out_of_scope_refusal": 5
+  },
+  "schemas": [
+    "schemas/recommendation_snapshot.schema.json",
+    "schemas/sft_candidate.schema.json"
+  ],
+  "fixture_globs": [
+    "fixtures/01_beverage_recommendation_explanation/*.json",
+    "fixtures/02_venue_recommendation_explanation/*.json",
+    "fixtures/03_tradeoff_explanation/*.json",
+    "fixtures/04_profile_missing_insufficient_data/*.json",
+    "fixtures/05_out_of_scope_refusal/*.json"
+  ],
+  "validation_command": "python3 scripts/validate_chatbot_sft_snapshots.py",
+  "human_review_required": true
+}

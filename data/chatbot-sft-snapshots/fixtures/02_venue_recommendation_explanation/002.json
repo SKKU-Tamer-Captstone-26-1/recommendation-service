@@ -1,0 +1,132 @@
+{
+  "schema_version": "chatbot_sft_snapshot_v1",
+  "snapshot_id": "sft_snap_venue_recommendation_explanation_002",
+  "data_type": "venue_recommendation_explanation",
+  "created_at": "2026-06-02T00:00:00+09:00",
+  "language": "ko",
+  "fixture_policy": {
+    "is_synthetic_fixture": true,
+    "is_training_example": false,
+    "human_review_required": true
+  },
+  "source_policy": {
+    "allowed_sources": [
+      "recommendation-service venue recommendation output",
+      "recommendation-service map/place read-model snapshot",
+      "recommendation-service reason codes"
+    ],
+    "disallowed_sources": [
+      "direct map database rows",
+      "Kakao response data outside approved policy",
+      "auth tokens",
+      "model memory"
+    ],
+    "pii_status": "no_pii",
+    "raw_data_policy": "Only synthetic recommendation read-model facts are present.",
+    "ranking_policy": "Assistant must preserve venue ranking and must not invent place facts."
+  },
+  "user_request": {
+    "text_ko": "데이트하기 좋은 칵테일 바 있어?",
+    "intent": "find_nearby_venue",
+    "requires_location": true
+  },
+  "grounded_context": {
+    "profile": {
+      "status": "active",
+      "profile_revision": 32,
+      "summary_ko": "달콤하고 산뜻한 칵테일과 차분한 분위기를 선호합니다.",
+      "preferred_categories": [
+        "bar",
+        "pub"
+      ],
+      "budget": "30k_100k"
+    },
+    "recommendations": [
+      {
+        "type": "venue",
+        "rank": 1,
+        "place_id": "fixture_place_venue_002_001",
+        "name_en": "Fixture Velvet Lounge",
+        "display_name_ko": "픽스처 벨벳 라운지",
+        "place_name": "Fixture Velvet Lounge",
+        "place_type": "bar",
+        "distance_m": 530,
+        "atmosphere": "차분하고 조명이 낮은 라운지 분위기",
+        "menu": [
+          "시트러스 마티니",
+          "진토닉"
+        ],
+        "price_range": "18000-28000",
+        "availability_status": "likely_available",
+        "inventory_confidence": 0.77,
+        "price_confidence": 0.78,
+        "reason_codes": [
+          "GOOD_ATMOSPHERE",
+          "MATCHES_CLEAN_LIGHT_PROFILE"
+        ],
+        "explanation": "차분한 분위기와 산뜻한 칵테일 메뉴가 잘 맞습니다."
+      },
+      {
+        "type": "venue",
+        "rank": 2,
+        "place_id": "fixture_place_venue_002_002",
+        "name_en": "Fixture Garden Bar",
+        "display_name_ko": "픽스처 가든 바",
+        "place_name": "Fixture Garden Bar",
+        "place_type": "bar",
+        "distance_m": 910,
+        "atmosphere": "밝고 캐주얼한 테라스 분위기",
+        "menu": [
+          "모히토",
+          "하이볼"
+        ],
+        "price_range": "15000-24000",
+        "availability_status": "likely_available",
+        "inventory_confidence": 0.8,
+        "price_confidence": 0.78,
+        "reason_codes": [
+          "MATCHES_CLEAN_LIGHT_PROFILE",
+          "ADJACENT_DISCOVERY"
+        ],
+        "explanation": "밝은 분위기를 원할 때 볼 수 있는 대안입니다."
+      }
+    ],
+    "missing_facts": [],
+    "used_sources": [
+      {
+        "source_type": "venue_recommendation",
+        "source_service": "recommendation-service",
+        "request_id": "fixture_rec_req_venue_recommendation_002",
+        "result_id": "fixture_rec_result_venue_recommendation_002",
+        "scoring_config_version": "fixture_scoring_v1",
+        "profile_revision": 32
+      }
+    ]
+  },
+  "expected_assistant_behavior": {
+    "answer_ko": "데이트 분위기라면 Fixture Velvet Lounge가 1순위입니다. 530m 거리이고 차분하고 조명이 낮은 라운지 분위기라서 산뜻한 칵테일 선호와 잘 맞습니다. 더 밝고 캐주얼한 곳을 원하면 Fixture Garden Bar가 두 번째 후보입니다.",
+    "refused": false,
+    "refusal_reason": "",
+    "must_include": [
+      "Fixture Velvet Lounge",
+      "530m",
+      "차분",
+      "Fixture Garden Bar"
+    ],
+    "must_not_include": [
+      "새로운 장소 이름",
+      "영업 중 확정",
+      "실시간 재고 확정",
+      "도보 시간",
+      "추천 순서 변경"
+    ],
+    "preserve_recommendation_order": true,
+    "notes": "Expected answer must preserve venue ranking and avoid live availability claims."
+  },
+  "human_review": {
+    "status": "draft",
+    "reviewer": "",
+    "notes": "Synthetic venue recommendation fixture for manual review.",
+    "risk_flags": []
+  }
+}

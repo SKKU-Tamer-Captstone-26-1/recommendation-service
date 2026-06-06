@@ -1,0 +1,123 @@
+{
+  "schema_version": "chatbot_sft_snapshot_v1",
+  "snapshot_id": "sft_snap_beverage_recommendation_explanation_001",
+  "data_type": "beverage_recommendation_explanation",
+  "created_at": "2026-06-02T00:00:00+09:00",
+  "language": "ko",
+  "fixture_policy": {
+    "is_synthetic_fixture": true,
+    "is_training_example": false,
+    "human_review_required": true
+  },
+  "source_policy": {
+    "allowed_sources": [
+      "recommendation-service beverage recommendation output",
+      "recommendation-service derived profile summary",
+      "recommendation-service reason codes"
+    ],
+    "disallowed_sources": [
+      "raw survey answers",
+      "auth tokens",
+      "direct survey database rows",
+      "direct map database rows",
+      "model memory"
+    ],
+    "pii_status": "no_pii",
+    "raw_data_policy": "No raw survey answers, auth tokens, or cross-service DB rows are present.",
+    "ranking_policy": "Assistant must preserve recommendation-service beverage ranking and must not rerank."
+  },
+  "user_request": {
+    "text_ko": "바닐라랑 오크 느낌 나는 위스키 추천해줘.",
+    "intent": "recommend_beverage",
+    "requires_location": false
+  },
+  "grounded_context": {
+    "profile": {
+      "status": "active",
+      "profile_revision": 21,
+      "summary_ko": "바닐라, 캐러멜, 오크 계열의 위스키를 선호하고 스모키함은 낮게 선호합니다.",
+      "preferred_categories": [
+        "whiskey"
+      ],
+      "budget": "30k_100k"
+    },
+    "recommendations": [
+      {
+        "type": "beverage",
+        "rank": 1,
+        "beverage_id": "fixture_bev_001_001",
+        "name_en": "Wild Turkey 101",
+        "display_name_ko": "와일드 터키 101",
+        "canonical_name": "Wild Turkey 101",
+        "category": "whiskey",
+        "style": "bourbon",
+        "flavor_tags": [
+          "vanilla_caramel",
+          "oak_woody"
+        ],
+        "reason_codes": [
+          "MATCHES_VANILLA_CARAMEL",
+          "MATCHES_RICH_OAK_PROFILE",
+          "WITHIN_BUDGET"
+        ],
+        "explanation": "바닐라, 캐러멜, 오크 계열 선호와 예산 범위가 잘 맞습니다."
+      },
+      {
+        "type": "beverage",
+        "rank": 2,
+        "beverage_id": "fixture_bev_001_002",
+        "name_en": "Glenmorangie Original 10",
+        "display_name_ko": "글렌모렌지 오리지널 10년",
+        "canonical_name": "Glenmorangie Original 10",
+        "category": "whiskey",
+        "style": "single_malt",
+        "flavor_tags": [
+          "floral",
+          "citrus_berry"
+        ],
+        "reason_codes": [
+          "MATCHES_CLEAN_LIGHT_PROFILE",
+          "BEGINNER_FRIENDLY"
+        ],
+        "explanation": "부담이 적은 향과 산뜻한 계열을 원할 때 맞는 후보입니다."
+      }
+    ],
+    "missing_facts": [],
+    "used_sources": [
+      {
+        "source_type": "beverage_recommendation",
+        "source_service": "recommendation-service",
+        "request_id": "fixture_rec_req_beverage_recommendation_001",
+        "result_id": "fixture_rec_result_beverage_recommendation_001",
+        "scoring_config_version": "fixture_scoring_v1",
+        "profile_revision": 21
+      }
+    ]
+  },
+  "expected_assistant_behavior": {
+    "answer_ko": "추천 순서대로 보면 Wild Turkey 101이 가장 잘 맞습니다. 바닐라, 캐러멜, 오크 계열 선호와 예산 범위가 직접 연결되어 있어요. 두 번째 후보는 Glenmorangie Original 10으로, 더 가볍고 산뜻한 방향을 원할 때 볼 수 있습니다.",
+    "refused": false,
+    "refusal_reason": "",
+    "must_include": [
+      "Wild Turkey 101",
+      "바닐라",
+      "오크",
+      "Glenmorangie Original 10"
+    ],
+    "must_not_include": [
+      "새로운 술 이름",
+      "장소 이름",
+      "가격",
+      "거리",
+      "추천 순서 변경"
+    ],
+    "preserve_recommendation_order": true,
+    "notes": "Expected answer must preserve beverage ranking and only paraphrase grounded reasons."
+  },
+  "human_review": {
+    "status": "draft",
+    "reviewer": "",
+    "notes": "Synthetic beverage recommendation fixture for manual review.",
+    "risk_flags": []
+  }
+}

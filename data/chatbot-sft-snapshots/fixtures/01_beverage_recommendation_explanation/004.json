@@ -1,0 +1,122 @@
+{
+  "schema_version": "chatbot_sft_snapshot_v1",
+  "snapshot_id": "sft_snap_beverage_recommendation_explanation_004",
+  "data_type": "beverage_recommendation_explanation",
+  "created_at": "2026-06-02T00:00:00+09:00",
+  "language": "ko",
+  "fixture_policy": {
+    "is_synthetic_fixture": true,
+    "is_training_example": false,
+    "human_review_required": true
+  },
+  "source_policy": {
+    "allowed_sources": [
+      "recommendation-service beverage recommendation output",
+      "recommendation-service derived profile summary",
+      "recommendation-service reason codes"
+    ],
+    "disallowed_sources": [
+      "raw survey answers",
+      "auth tokens",
+      "direct survey database rows",
+      "direct map database rows",
+      "model memory"
+    ],
+    "pii_status": "no_pii",
+    "raw_data_policy": "No raw survey answers, auth tokens, or cross-service DB rows are present.",
+    "ranking_policy": "Assistant must preserve recommendation-service beverage ranking and must not rerank."
+  },
+  "user_request": {
+    "text_ko": "스모키한 술이 좋아. 너무 달지 않은 걸로 추천해줘.",
+    "intent": "recommend_beverage",
+    "requires_location": false
+  },
+  "grounded_context": {
+    "profile": {
+      "status": "active",
+      "profile_revision": 24,
+      "summary_ko": "스모키하고 피트한 향을 선호하며 단맛은 낮게 선호합니다.",
+      "preferred_categories": [
+        "whiskey"
+      ],
+      "budget": "100k_200k"
+    },
+    "recommendations": [
+      {
+        "type": "beverage",
+        "rank": 1,
+        "beverage_id": "fixture_bev_004_001",
+        "name_en": "Laphroaig 10 Year Old",
+        "display_name_ko": "라프로익 10년",
+        "canonical_name": "Laphroaig 10 Year Old",
+        "category": "whiskey",
+        "style": "peated_single_malt",
+        "flavor_tags": [
+          "smoky_peated",
+          "saline"
+        ],
+        "reason_codes": [
+          "MATCHES_SMOKY_PROFILE",
+          "MATCHES_LOW_SWEETNESS"
+        ],
+        "explanation": "스모키하고 피트한 향 선호와 낮은 단맛 선호가 잘 맞습니다."
+      },
+      {
+        "type": "beverage",
+        "rank": 2,
+        "beverage_id": "fixture_bev_004_002",
+        "name_en": "Talisker 10 Year Old",
+        "display_name_ko": "탈리스커 10년",
+        "canonical_name": "Talisker 10 Year Old",
+        "category": "whiskey",
+        "style": "peated_single_malt",
+        "flavor_tags": [
+          "smoky_peated",
+          "spicy"
+        ],
+        "reason_codes": [
+          "MATCHES_SMOKY_PROFILE",
+          "MATCHES_SPICY_PROFILE"
+        ],
+        "explanation": "스모키함과 스파이시한 방향을 함께 선호할 때 맞는 후보입니다."
+      }
+    ],
+    "missing_facts": [],
+    "used_sources": [
+      {
+        "source_type": "beverage_recommendation",
+        "source_service": "recommendation-service",
+        "request_id": "fixture_rec_req_beverage_recommendation_004",
+        "result_id": "fixture_rec_result_beverage_recommendation_004",
+        "scoring_config_version": "fixture_scoring_v1",
+        "profile_revision": 24
+      }
+    ]
+  },
+  "expected_assistant_behavior": {
+    "answer_ko": "스모키하고 단맛이 낮은 방향이면 Laphroaig 10 Year Old가 1순위입니다. 피트한 향과 낮은 단맛 선호가 추천 이유와 직접 맞습니다. 두 번째 후보는 Talisker 10 Year Old로, 스모키함에 스파이시한 느낌까지 원할 때 적합합니다.",
+    "refused": false,
+    "refusal_reason": "",
+    "must_include": [
+      "Laphroaig 10 Year Old",
+      "스모키",
+      "단맛",
+      "Talisker 10 Year Old"
+    ],
+    "must_not_include": [
+      "새로운 술 이름",
+      "장소 이름",
+      "가격",
+      "거리",
+      "추천 순서 변경"
+    ],
+    "preserve_recommendation_order": true,
+    "notes": "Expected answer must preserve beverage ranking and only paraphrase grounded reasons."
+  },
+  "human_review": {
+    "status": "draft",
+    "reviewer": "",
+    "notes": "Synthetic beverage recommendation fixture for manual review.",
+    "risk_flags": []
+  }
+}

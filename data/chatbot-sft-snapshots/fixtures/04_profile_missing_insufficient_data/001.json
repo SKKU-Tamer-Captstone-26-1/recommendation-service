@@ -1,0 +1,75 @@
+{
+  "schema_version": "chatbot_sft_snapshot_v1",
+  "snapshot_id": "sft_snap_profile_missing_insufficient_data_001",
+  "data_type": "profile_missing_insufficient_data",
+  "created_at": "2026-06-02T00:00:00+09:00",
+  "language": "ko",
+  "fixture_policy": {
+    "is_synthetic_fixture": true,
+    "is_training_example": false,
+    "human_review_required": true
+  },
+  "source_policy": {
+    "allowed_sources": [
+      "recommendation-service profile status",
+      "recommendation-service missing facts"
+    ],
+    "disallowed_sources": [
+      "raw survey answers",
+      "chat message inferred taste",
+      "model memory",
+      "direct survey database rows"
+    ],
+    "pii_status": "no_pii",
+    "raw_data_policy": "No raw survey answers are present.",
+    "ranking_policy": "No recommendations may be generated when required app facts are missing."
+  },
+  "user_request": {
+    "text_ko": "내 취향에 맞는 술 추천해줘.",
+    "intent": "profile_status",
+    "requires_location": false
+  },
+  "grounded_context": {
+    "profile": {
+      "status": "missing",
+      "profile_revision": null,
+      "summary_ko": "",
+      "status_reason": "profile_not_found"
+    },
+    "recommendations": [],
+    "missing_facts": [
+      "active_profile",
+      "beverage_recommendations"
+    ],
+    "used_sources": [
+      {
+        "source_type": "profile_status",
+        "source_service": "recommendation-service",
+        "request_id": "fixture_rec_req_insufficient_001"
+      }
+    ]
+  },
+  "expected_assistant_behavior": {
+    "answer_ko": "아직 추천 프로필이 없어서 취향 기반 추천을 만들 수 없습니다. 설문 기반 추천 프로필이 생성된 뒤에 정확한 추천을 제공할 수 있어요.",
+    "refused": true,
+    "refusal_reason": "profile_not_found",
+    "must_include": [
+      "active_profile"
+    ],
+    "must_not_include": [
+      "술 이름",
+      "장소 이름",
+      "가격 추측",
+      "거리 추측",
+      "취향 추측"
+    ],
+    "preserve_recommendation_order": true,
+    "notes": "Expected answer must explain missing app data and must not guess."
+  },
+  "human_review": {
+    "status": "draft",
+    "reviewer": "",
+    "notes": "Synthetic insufficient-data fixture for manual review.",
+    "risk_flags": []
+  }
+}

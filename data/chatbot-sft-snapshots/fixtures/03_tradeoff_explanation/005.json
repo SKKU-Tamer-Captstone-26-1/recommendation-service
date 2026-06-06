@@ -1,0 +1,123 @@
+{
+  "schema_version": "chatbot_sft_snapshot_v1",
+  "snapshot_id": "sft_snap_tradeoff_explanation_005",
+  "data_type": "tradeoff_explanation",
+  "created_at": "2026-06-02T00:00:00+09:00",
+  "language": "ko",
+  "fixture_policy": {
+    "is_synthetic_fixture": true,
+    "is_training_example": false,
+    "human_review_required": true
+  },
+  "source_policy": {
+    "allowed_sources": [
+      "recommendation-service purchase option output",
+      "recommendation-service venue snapshot metadata",
+      "recommendation-service price and distance facts"
+    ],
+    "disallowed_sources": [
+      "direct map database rows",
+      "unverified live inventory",
+      "route time from model memory",
+      "new price estimates"
+    ],
+    "pii_status": "no_pii",
+    "raw_data_policy": "Only synthetic recommendation snapshot facts are present.",
+    "ranking_policy": "Assistant may compare trade-offs but must not create new option labels or reorder ranked options."
+  },
+  "user_request": {
+    "text_ko": "가까운데 재고 신뢰도 낮은 곳도 괜찮을까?",
+    "intent": "compare_purchase_options",
+    "requires_location": true
+  },
+  "grounded_context": {
+    "profile": {
+      "status": "active",
+      "profile_revision": 45,
+      "summary_ko": "가격, 거리, 분위기를 함께 비교하려는 사용자입니다.",
+      "preferred_categories": [
+        "whiskey",
+        "bar"
+      ],
+      "budget": "30k_100k"
+    },
+    "recommendations": [
+      {
+        "type": "purchase_option",
+        "rank": 1,
+        "option_type": "nearest_reasonable",
+        "tradeoff_type": "closer_but_more_expensive",
+        "place_id": "fixture_place_trade_005_001",
+        "place_name": "Fixture Close Pub",
+        "beverage_name": "Fixture Bourbon Whiskey",
+        "distance_m": 210,
+        "price_krw": 44000,
+        "atmosphere": "캐주얼한 펍 분위기",
+        "availability_status": "likely_available",
+        "inventory_confidence": 0.45,
+        "price_confidence": 0.45,
+        "reason_codes": [
+          "NEAREST_REASONABLE",
+          "WITHIN_BUDGET"
+        ],
+        "explanation": "가깝지만 availability confidence가 낮습니다."
+      },
+      {
+        "type": "purchase_option",
+        "rank": 2,
+        "option_type": "balanced_best",
+        "tradeoff_type": "better_atmosphere_but_stale_price",
+        "place_id": "fixture_place_trade_005_002",
+        "place_name": "Fixture Reliable Bar",
+        "beverage_name": "Fixture Bourbon Whiskey",
+        "distance_m": 780,
+        "price_krw": 47000,
+        "atmosphere": "조용하고 안정적인 바 분위기",
+        "availability_status": "likely_available",
+        "inventory_confidence": 0.83,
+        "price_confidence": 0.83,
+        "reason_codes": [
+          "BALANCED_BEST",
+          "WITHIN_BUDGET"
+        ],
+        "explanation": "더 멀지만 availability confidence가 높습니다."
+      }
+    ],
+    "missing_facts": [],
+    "used_sources": [
+      {
+        "source_type": "purchase_option_recommendation",
+        "source_service": "recommendation-service",
+        "request_id": "fixture_rec_req_purchase_option_recommendation_005",
+        "result_id": "fixture_rec_result_purchase_option_recommendation_005",
+        "scoring_config_version": "fixture_scoring_v1",
+        "profile_revision": 45
+      }
+    ]
+  },
+  "expected_assistant_behavior": {
+    "answer_ko": "Fixture Close Pub은 210m로 매우 가깝지만 재고 신뢰도가 낮아서 확정처럼 말하기 어렵습니다. 더 안정적으로 보려면 Fixture Reliable Bar가 780m로 멀지만 재고 신뢰도가 더 높고 조용한 분위기입니다.",
+    "refused": false,
+    "refusal_reason": "",
+    "must_include": [
+      "Fixture Close Pub",
+      "210",
+      "44,000원",
+      "Fixture Reliable Bar"
+    ],
+    "must_not_include": [
+      "새로운 장소",
+      "새로운 가격",
+      "도보 시간",
+      "실시간 재고 확정"
+    ],
+    "preserve_recommendation_order": true,
+    "notes": "Expected answer must disclose uncertainty when confidence or freshness is weak."
+  },
+  "human_review": {
+    "status": "draft",
+    "reviewer": "",
+    "notes": "Synthetic trade-off fixture for manual review.",
+    "risk_flags": []
+  }
+}

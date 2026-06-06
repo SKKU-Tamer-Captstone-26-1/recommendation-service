@@ -1,0 +1,122 @@
+{
+  "schema_version": "chatbot_sft_snapshot_v1",
+  "snapshot_id": "sft_snap_beverage_recommendation_explanation_002",
+  "data_type": "beverage_recommendation_explanation",
+  "created_at": "2026-06-02T00:00:00+09:00",
+  "language": "ko",
+  "fixture_policy": {
+    "is_synthetic_fixture": true,
+    "is_training_example": false,
+    "human_review_required": true
+  },
+  "source_policy": {
+    "allowed_sources": [
+      "recommendation-service beverage recommendation output",
+      "recommendation-service derived profile summary",
+      "recommendation-service reason codes"
+    ],
+    "disallowed_sources": [
+      "raw survey answers",
+      "auth tokens",
+      "direct survey database rows",
+      "direct map database rows",
+      "model memory"
+    ],
+    "pii_status": "no_pii",
+    "raw_data_policy": "No raw survey answers, auth tokens, or cross-service DB rows are present.",
+    "ranking_policy": "Assistant must preserve recommendation-service beverage ranking and must not rerank."
+  },
+  "user_request": {
+    "text_ko": "상큼한 진이나 칵테일 베이스 추천해줘.",
+    "intent": "recommend_beverage",
+    "requires_location": false
+  },
+  "grounded_context": {
+    "profile": {
+      "status": "active",
+      "profile_revision": 22,
+      "summary_ko": "시트러스와 허브 계열을 선호하고 단맛은 중간 정도를 선호합니다.",
+      "preferred_categories": [
+        "cocktail"
+      ],
+      "budget": "30k_100k"
+    },
+    "recommendations": [
+      {
+        "type": "beverage",
+        "rank": 1,
+        "beverage_id": "fixture_bev_002_001",
+        "name_en": "Tanqueray No. Ten Gin",
+        "display_name_ko": "탱커레이 넘버 텐 진",
+        "canonical_name": "Tanqueray No. Ten Gin",
+        "category": "gin",
+        "style": "citrus_gin",
+        "flavor_tags": [
+          "citrus_berry",
+          "herb_mint"
+        ],
+        "reason_codes": [
+          "MATCHES_CLEAN_LIGHT_PROFILE",
+          "MATCHES_HERBAL_PROFILE"
+        ],
+        "explanation": "시트러스와 허브 계열 선호가 잘 맞습니다."
+      },
+      {
+        "type": "beverage",
+        "rank": 2,
+        "beverage_id": "fixture_bev_002_002",
+        "name_en": "Campari",
+        "display_name_ko": "캄파리",
+        "canonical_name": "Campari",
+        "category": "liqueur",
+        "style": "bitter_aperitif",
+        "flavor_tags": [
+          "bitter",
+          "citrus_berry"
+        ],
+        "reason_codes": [
+          "ADJACENT_DISCOVERY",
+          "MATCHES_CITRUS_PROFILE"
+        ],
+        "explanation": "상큼함과 쌉쌀한 방향을 함께 탐색할 수 있는 후보입니다."
+      }
+    ],
+    "missing_facts": [],
+    "used_sources": [
+      {
+        "source_type": "beverage_recommendation",
+        "source_service": "recommendation-service",
+        "request_id": "fixture_rec_req_beverage_recommendation_002",
+        "result_id": "fixture_rec_result_beverage_recommendation_002",
+        "scoring_config_version": "fixture_scoring_v1",
+        "profile_revision": 22
+      }
+    ]
+  },
+  "expected_assistant_behavior": {
+    "answer_ko": "상큼한 방향이면 Tanqueray No. Ten Gin을 먼저 추천합니다. 시트러스와 허브 계열 선호가 추천 이유와 잘 맞아요. 조금 더 쌉쌀한 탐색 후보로는 Campari가 두 번째로 적합합니다.",
+    "refused": false,
+    "refusal_reason": "",
+    "must_include": [
+      "Tanqueray No. Ten Gin",
+      "시트러스",
+      "허브",
+      "Campari"
+    ],
+    "must_not_include": [
+      "새로운 술 이름",
+      "장소 이름",
+      "가격",
+      "거리",
+      "추천 순서 변경"
+    ],
+    "preserve_recommendation_order": true,
+    "notes": "Expected answer must preserve beverage ranking and only paraphrase grounded reasons."
+  },
+  "human_review": {
+    "status": "draft",
+    "reviewer": "",
+    "notes": "Synthetic beverage recommendation fixture for manual review.",
+    "risk_flags": []
+  }
+}

@@ -1,0 +1,121 @@
+{
+  "schema_version": "chatbot_sft_snapshot_v1",
+  "snapshot_id": "sft_snap_beverage_recommendation_explanation_003",
+  "data_type": "beverage_recommendation_explanation",
+  "created_at": "2026-06-02T00:00:00+09:00",
+  "language": "ko",
+  "fixture_policy": {
+    "is_synthetic_fixture": true,
+    "is_training_example": false,
+    "human_review_required": true
+  },
+  "source_policy": {
+    "allowed_sources": [
+      "recommendation-service beverage recommendation output",
+      "recommendation-service derived profile summary",
+      "recommendation-service reason codes"
+    ],
+    "disallowed_sources": [
+      "raw survey answers",
+      "auth tokens",
+      "direct survey database rows",
+      "direct map database rows",
+      "model memory"
+    ],
+    "pii_status": "no_pii",
+    "raw_data_policy": "No raw survey answers, auth tokens, or cross-service DB rows are present.",
+    "ranking_policy": "Assistant must preserve recommendation-service beverage ranking and must not rerank."
+  },
+  "user_request": {
+    "text_ko": "가볍게 마시기 좋은 맥주 추천해줘.",
+    "intent": "recommend_beverage",
+    "requires_location": false
+  },
+  "grounded_context": {
+    "profile": {
+      "status": "active",
+      "profile_revision": 23,
+      "summary_ko": "탄산감 있고 산뜻한 맥주를 선호하며 강한 쓴맛은 낮게 선호합니다.",
+      "preferred_categories": [
+        "beer"
+      ],
+      "budget": "under_30k"
+    },
+    "recommendations": [
+      {
+        "type": "beverage",
+        "rank": 1,
+        "beverage_id": "fixture_bev_003_001",
+        "name_en": "Allagash White",
+        "display_name_ko": "앨러개쉬 화이트",
+        "canonical_name": "Allagash White",
+        "category": "beer",
+        "style": "witbier",
+        "flavor_tags": [
+          "citrus_berry",
+          "floral"
+        ],
+        "reason_codes": [
+          "MATCHES_CLEAN_LIGHT_PROFILE",
+          "BEGINNER_FRIENDLY"
+        ],
+        "explanation": "산뜻하고 가벼운 맥주 선호와 잘 맞는 후보입니다."
+      },
+      {
+        "type": "beverage",
+        "rank": 2,
+        "beverage_id": "fixture_bev_003_002",
+        "name_en": "Fixture Lager Beer",
+        "display_name_ko": "픽스처 라거 맥주",
+        "canonical_name": "Fixture Lager Beer",
+        "category": "beer",
+        "style": "lager",
+        "flavor_tags": [
+          "clean",
+          "carbonation"
+        ],
+        "reason_codes": [
+          "MATCHES_CLEAN_LIGHT_PROFILE",
+          "WITHIN_BUDGET"
+        ],
+        "explanation": "깔끔하고 부담이 낮은 예산 내 후보입니다."
+      }
+    ],
+    "missing_facts": [],
+    "used_sources": [
+      {
+        "source_type": "beverage_recommendation",
+        "source_service": "recommendation-service",
+        "request_id": "fixture_rec_req_beverage_recommendation_003",
+        "result_id": "fixture_rec_result_beverage_recommendation_003",
+        "scoring_config_version": "fixture_scoring_v1",
+        "profile_revision": 23
+      }
+    ]
+  },
+  "expected_assistant_behavior": {
+    "answer_ko": "가볍게 마시기 좋은 쪽이면 Allagash White를 먼저 볼 수 있습니다. 산뜻하고 가벼운 맥주 선호와 잘 맞습니다. 더 깔끔하고 예산 부담이 낮은 후보로는 Fixture Lager Beer가 두 번째입니다.",
+    "refused": false,
+    "refusal_reason": "",
+    "must_include": [
+      "Allagash White",
+      "산뜻",
+      "Fixture Lager Beer"
+    ],
+    "must_not_include": [
+      "새로운 술 이름",
+      "장소 이름",
+      "가격",
+      "거리",
+      "추천 순서 변경"
+    ],
+    "preserve_recommendation_order": true,
+    "notes": "Expected answer must preserve beverage ranking and only paraphrase grounded reasons."
+  },
+  "human_review": {
+    "status": "draft",
+    "reviewer": "",
+    "notes": "Synthetic beverage recommendation fixture for manual review.",
+    "risk_flags": []
+  }
+}
