@@ -9,6 +9,7 @@ from app.db.session import SessionLocal
 from app.grpc.gen import recommendation_pb2_grpc
 from app.grpc.recommendation_service import RecommendationGrpcServicer
 from app.services.auth import create_auth_context_resolver
+from app.services.recommendations import VenueDistanceProvider
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,7 @@ def create_grpc_server(
     settings: Settings | None = None,
     *,
     bind_port: bool = True,
+    venue_distance_provider: VenueDistanceProvider | None = None,
 ) -> grpc.Server:
     resolved_settings = settings or get_settings()
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
@@ -32,6 +34,8 @@ def create_grpc_server(
         RecommendationGrpcServicer(
             SessionLocal,
             create_auth_context_resolver(resolved_settings),
+            settings=resolved_settings,
+            venue_distance_provider=venue_distance_provider,
         ),
         server,
     )

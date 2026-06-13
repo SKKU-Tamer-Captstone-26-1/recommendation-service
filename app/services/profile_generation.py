@@ -88,6 +88,61 @@ SURVEY_BUDGET_ALIASES = {
     "100k_200k": "100000_200000",
     "over_200k": "over_200000",
 }
+DEPLOYED_SURVEY_LEVELS = ("beginner", "enthusiast", "expert")
+DEPLOYED_SURVEY_CATEGORIES = (
+    "whiskey",
+    "wine",
+    "cognac",
+    "cocktail",
+    "beer",
+)
+DEPLOYED_SURVEY_CATEGORY_TRAITS = {
+    "whiskey": (
+        "bourbon_character",
+        "sherry_character",
+        "peat_character",
+        "floral_citrus",
+        "american_whiskey",
+    ),
+    "wine": (
+        "full_red",
+        "light_red_rose",
+        "white",
+        "sparkling",
+        "fortified",
+    ),
+    "cocktail": (
+        "tropical_tiki",
+        "tart_balanced",
+        "refreshing_long",
+        "dessert_cream",
+        "bold_spirit_fwd",
+    ),
+    "beer": (
+        "lager_pilsner",
+        "pale_ale_ipa",
+        "stout_porter",
+        "weizen_white",
+        "sour_wild",
+    ),
+}
+DEPLOYED_SURVEY_FLAVOR_KEYWORDS = (
+    "vanilla_caramel",
+    "citrus_berry",
+    "dried_choco",
+    "oak_woody",
+    "smoky_peated",
+    "almond_nutty",
+    "floral",
+    "spicy",
+    "herb_mint",
+)
+DEPLOYED_SURVEY_BUDGET_RANGES = (
+    "under_30k",
+    "30k_100k",
+    "100k_200k",
+    "over_200k",
+)
 
 
 @dataclass(frozen=True)
@@ -185,9 +240,17 @@ class SurveyMapperV1:
 class ProfileGenerationService:
     """Persists derived profiles without owning raw survey answers."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(
+        self,
+        session: Session,
+        *,
+        active_scoring_config: str | None = None,
+    ) -> None:
         self._session = session
         self._mapper = SurveyMapperV1()
+        self._active_scoring_config = (
+            active_scoring_config or get_settings().active_scoring_config
+        )
 
     def generate_from_survey_input(
         self,
@@ -226,7 +289,10 @@ class ProfileGenerationService:
             return existing_profile
 
         vector_schema = _active_vector_schema(self._session)
-        scoring_config = _active_beverage_scoring(self._session)
+        scoring_config = _active_beverage_scoring(
+            self._session,
+            self._active_scoring_config,
+        )
         generated = self._mapper.map(survey_input)
 
         state = self._session.get(UserProfileState, survey_input.external_user_id)
@@ -362,17 +428,17 @@ def _active_vector_schema(session: Session) -> VectorSchemaVersion:
     return vector_schema
 
 
-def _active_beverage_scoring(session: Session) -> ScoringConfig:
+def _active_beverage_scoring(session: Session, version: str) -> ScoringConfig:
     scoring = session.scalar(
         select(ScoringConfig).where(
-            ScoringConfig.version == "scoring_v1",
+            ScoringConfig.version == version,
             ScoringConfig.target_type == "beverage",
             ScoringConfig.category == "all",
             ScoringConfig.status == "active",
         ),
     )
     if scoring is None:
-        raise ValueError("active beverage scoring_v1 config is missing")
+        raise ValueError(f"active beverage {version} config is missing")
     return scoring
 
 

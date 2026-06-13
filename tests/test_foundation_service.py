@@ -23,7 +23,7 @@ def test_foundation_service_reports_ready_when_active_versions_exist() -> None:
     repository.list_active_scoring_configs.return_value = (
         ScoringConfig(
             name="default_scoring",
-            version="scoring_v1",
+            version="scoring_v3",
             target_type="beverage",
             category="all",
             weights_json={},
@@ -31,7 +31,7 @@ def test_foundation_service_reports_ready_when_active_versions_exist() -> None:
         ),
         ScoringConfig(
             name="default_scoring",
-            version="scoring_v1",
+            version="scoring_v3",
             target_type="venue",
             category="all",
             weights_json={},
@@ -39,7 +39,10 @@ def test_foundation_service_reports_ready_when_active_versions_exist() -> None:
         ),
     )
 
-    service = FoundationService(repository, Settings())
+    service = FoundationService(
+        repository,
+        Settings(active_scoring_config="scoring_v3"),
+    )
     state = service.load_active_registry_state()
 
     assert state.is_ready
@@ -52,13 +55,16 @@ def test_foundation_service_reports_missing_version_records() -> None:
     repository.get_active_mapper_version.return_value = None
     repository.list_active_scoring_configs.return_value = ()
 
-    service = FoundationService(repository, Settings())
+    service = FoundationService(
+        repository,
+        Settings(active_scoring_config="scoring_v3"),
+    )
     state = service.load_active_registry_state()
 
     assert not state.is_ready
     assert state.missing_keys == (
         "vector_schema:taste_v1",
         "mapper:survey_mapper_v1_1",
-        "scoring:scoring_v1:beverage",
-        "scoring:scoring_v1:venue",
+        "scoring:scoring_v3:beverage",
+        "scoring:scoring_v3:venue",
     )

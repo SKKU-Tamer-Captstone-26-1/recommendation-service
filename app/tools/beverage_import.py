@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.services.beverage_import import BeverageCandidateImporter
 
@@ -19,8 +20,14 @@ def main() -> int:
     if not args.stage and not args.promote_seed:
         parser.error("choose at least one of --stage or --promote-seed")
 
+    settings = get_settings()
+
     with SessionLocal() as session:
-        importer = BeverageCandidateImporter(session, args.data_dir)
+        importer = BeverageCandidateImporter(
+            session,
+            args.data_dir,
+            image_cdn_base_url=settings.beverage_image_cdn_base_url,
+        )
         if args.stage:
             counts = importer.stage_candidates()
             print(

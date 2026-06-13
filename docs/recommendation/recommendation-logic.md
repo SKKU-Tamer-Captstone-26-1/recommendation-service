@@ -116,6 +116,7 @@ Hard filters remove candidates before final scoring:
 - unsupported category
 - unavailable market flag
 - outside requested venue radius
+- venue snapshot `place_type` outside requested `place_types`
 - hidden, closed, merged, or unpublished venue snapshot
 - expired inventory snapshot when no fallback is allowed
 - expired price snapshot when strict budget comparison is requested
@@ -151,6 +152,87 @@ Every response result MUST store:
 - profile revision ID
 - target type and target ID
 - source snapshot revisions for venue results
+- distance strategy, source, confidence, and route-vs-straight-line metadata for
+  venue results
+
+### Beverage Taste Similarity
+
+`scoring_v3` uses `category_weighted_similarity_v1` for beverage
+`taste_similarity_weighted`.
+
+The base taste vector remains `taste_v1`, but similarity gives slightly stronger
+weight to category-relevant dimensions. Examples:
+
+| Category | Emphasized dimensions |
+|---|---|
+| whiskey | `sweet`, `woody`, `smoky`, `body`, `alcohol_intensity` |
+| wine | `fruity`, `acidity`, `tannin`, `body`, `floral` |
+| beer | `bitterness`, `carbonation`, `body`, `roasted`, `acidity` |
+| cocktail | `sweet`, `acidity`, `herbal`, `carbonation`, `alcohol_intensity` |
+
+Rules:
+
+- `scoring_v1` and `scoring_v2` keep plain `cosine_taste_v1` behavior.
+- `scoring_v3` is additive and rollback-safe through
+  `ACTIVE_SCORING_CONFIG=scoring_v2`.
+- Category weights must be stored in `scoring_configs.reason_code_rules_json`.
+- Model features must expose `taste_similarity_feature.strategy` and
+  `taste_similarity_feature.dimension_weights`.
+- Category-aware weighting must not change the canonical vector schema.
+
+### Beverage Budget Fit
+
+`scoring_v2` and later use `catalog_price_range_soft_v1` for beverage
+`budget_fit`.
+
+Input evidence:
+
+```text
+taste_profile_revisions.budget_range
+beverage_items.price_min_krw
+beverage_items.price_max_krw
+beverage_items.metadata_json.price_policy
+beverage_items.metadata_json.price_observation_summary
+```
+
+Rules:
+
+- Missing budget or missing catalog price evidence returns neutral
+  `budget_fit = 0.5`.
+- Catalog price ranges are soft recommendation evidence only.
+- Catalog price ranges MUST NOT be presented as live venue/store/menu offers.
+- `over_200000` is premium-tolerant, not a hard ceiling.
+- In-budget ranges receive stronger fit only when price evidence confidence is
+  available.
+- Weak or non-policy price evidence is pulled toward neutral by confidence.
+
+Model features MUST preserve:
+
+```text
+budget_feature.strategy
+budget_feature.fit
+budget_feature.confidence
+budget_feature.evidence
+budget_feature.budget_range
+budget_feature.price_min_krw
+budget_feature.price_max_krw
+budget_feature.price_policy
+budget_tradeoff.policy_version
+budget_tradeoff.status
+budget_tradeoff.display_label_ko
+budget_tradeoff.note_ko
+budget_tradeoff.source
+```
+
+`budget_tradeoff` is explanation metadata for app/chatbot display. It is derived
+from `budget_feature` and MUST use
+`source = catalog_price_not_live_offer`. It may say that a beverage is within
+budget, near budget, above budget as a soft taste-vs-price trade-off, premium
+tolerant, or missing price evidence. It MUST NOT be interpreted as live store
+price, menu price, inventory, or strict affordability truth.
+
+Strict beverage budget filtering remains unavailable until approved live
+price/map snapshot semantics exist.
 
 ## Category-Specific Behavior
 
@@ -179,6 +261,130 @@ Recommended default:
 | expert | 70% | 30% |
 
 Exploration candidates MUST still pass hard filters and minimum similarity.
+
+### Beverage Follow-up Diversity Controls
+
+Beverage follow-up diversity is deterministic API behavior, not chatbot-side
+business logic.
+
+`GetBeverageRecommendations` supports these controls:
+
+| Field | Meaning |
+|---|---|
+| `exclude_beverage_ids` | Explicit beverage UUIDs that must not be returned |
+| `exclude_result_ids` | Prior recommendation result UUIDs resolved to beverage targets before ranking output |
+| `diversity_mode` | Bounded follow-up mode: `STANDARD`, `DIFFERENT`, or `ADJACENT` |
+| `flavor_direction` | Request-level taste direction such as `SWEETER`, `SMOKIER`, or `LIGHTER` |
+
+Behavior:
+
+- `STANDARD` preserves the normal ranked order after hard filters and explicit
+  exclusions.
+- `DIFFERENT` first avoids excluded beverages, then prefers candidates whose
+  style and category differ from the excluded context when the catalog allows it.
+- `ADJACENT` first avoids excluded beverages, then prefers a non-identical style
+  near the user's preferred category or requested category.
+
+These controls MUST be stored in recommendation request logs through
+`filters_json` and `request_context_json`.
+
+The service MUST return fewer results when the catalog is too small after
+exclusions. It MUST NOT fabricate beverage candidates, randomly reorder results,
+or let chatbot-service rerank the list.
+
+### Beverage Taste-Direction Follow-up Controls
+
+Taste-direction follow-up requests are user requests that change the desired
+flavor direction without asking for a random alternative:
+
+```text
+더 달게 추천해줘
+덜 피트한 쪽으로 추천해줘
+좀 더 가볍고 산뜻하게 추천해줘
+허브 느낌이 더 나는 술로 추천해줘
+```
+
+As of Plan 044, `GetBeverageRecommendations` supports a public
+`flavor_direction` enum for bounded taste-direction follow-ups. The request does
+not mutate the stored taste profile. It applies a deterministic request-level
+score adjustment from the candidate beverage vector and stores the policy,
+direction, fit, adjustment, and dimension weights in score metadata.
+
+Supported initial directions:
+
+```text
+SWEETER
+LESS_SWEET
+SMOKIER
+LESS_SMOKY
+LIGHTER
+RICHER
+MORE_HERBAL_BITTER
+BRIGHTER_FRUITY
+```
+
+Rules:
+
+- `flavor_direction` MUST be scored by recommendation-service, not chatbot-service
+  or Flutter.
+- The request adjustment MUST use only recommendation-owned beverage vector
+  data.
+- The stored profile vector MUST remain unchanged.
+- Request logs MUST preserve `filters_json.flavor_direction`,
+  `request_context_json.flavor_direction_policy`, and result-level
+  `request_controls.flavor_direction`.
+- Model features MUST preserve `flavor_direction_feature` with policy, direction,
+  fit, adjustment, and dimension weights.
+- Offline drink evaluation must require the rank-one result to be a
+  fixture-approved positive candidate. Top-k hit rate alone is not enough for a
+  production card surface because Flutter and chatbot-service usually show the
+  first recommendation most prominently.
+- The offline directional follow-up evaluator remains a release gate. Fixture
+  positives must score above explicit negatives for every declared direction.
+- Directional follow-up fixtures must also keep a minimum positive-vs-negative
+  score margin so subtle follow-up behavior does not pass release as a fragile
+  near-tie.
+- Offline drink evaluation must include fixtures that use the deployed
+  survey-service token vocabulary directly. The release gate requires full
+  coverage for deployed categories, category-style tokens, and flavor keywords
+  so mapper compatibility is proven through recommendation scoring, not only
+  through token-level mapper audit.
+
+### Interaction-Aware Suppression
+
+`scoring_v2` may use recommendation-owned interaction logs for deterministic
+server-side personalization before a learned model exists.
+
+Policy:
+
+```text
+recent_dismiss_v1
+```
+
+Rules:
+
+- `dismiss` is explicit negative feedback for the exact beverage ID.
+- `save`, `click`, and `detail_view` are positive or interest feedback.
+- `impression` is exposure only and MUST NOT be treated as negative feedback.
+- The latest signal per beverage wins.
+- A latest `dismiss` suppresses the exact beverage from beverage
+  recommendations.
+- A later `save`, `click`, or `detail_view` makes the exact beverage eligible
+  again.
+- This policy does not suppress similar styles, categories, brands, or venues.
+
+Recommendation request logs MUST preserve:
+
+```text
+filters_json.feedback_suppression.policy
+filters_json.feedback_suppression.suppressed_beverage_ids
+filters_json.feedback_suppression.positive_beverage_ids
+request_context_json.feedback_suppressed_count
+request_context_json.feedback_positive_count
+```
+
+This is not collaborative filtering or model training. It is a deterministic
+product rule over recommendation-owned interaction rows.
 
 ## Explainability
 
@@ -212,6 +418,18 @@ NEAREST_REASONABLE
 
 Explanation text MUST be generated from stored reason codes and score
 contributions. V1 MUST NOT depend on unbounded LLM-generated explanations.
+
+For beverage recommendations, the user-facing explanation is a deterministic
+Korean template assembled from ranked reason codes. `scoring_v3` uses
+`reason_template_v3`; the template version MUST be persisted in
+`recommendation_explanations.template_version` and debug metadata so Flutter,
+chatbot-service, and later evaluation reports can trace which explanation rule
+created the text.
+
+The template must preserve the recommendation rank and may only mention facts
+already present in the beverage catalog, score breakdown, matched dimensions,
+budget feature, and reason codes. It must not invent flavor notes, prices,
+availability, or venue context.
 
 LLM or assistant-generated prose MAY rewrite deterministic explanations only when
 the grounded context includes the original reason codes and score metadata. It

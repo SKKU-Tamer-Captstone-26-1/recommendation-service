@@ -191,6 +191,81 @@ bash scripts/deploy/gcp-run-staging-job.sh
 Jobs run with the `recommendation-service-staging` service account, the Cloud
 SQL connector, and recommendation-owned DB/Qdrant secrets.
 
+## Beverage Image Cache Preparation
+
+Dry-run inspection:
+
+```bash
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-provision-staging-image-cache.sh
+```
+
+Create the staging image cache bucket and CDN base URL secret:
+
+```bash
+RECOMMENDATION_IMAGE_CACHE_PROVISION_APPLY=1 \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-provision-staging-image-cache.sh
+```
+
+Defaults:
+
+```text
+bucket = ontheblock-beverage-images-staging-<project>
+location = asia-northeast3
+cdn_base_url_secret = recommendation-beverage-image-cdn-base-url-staging
+public_read = false
+```
+
+Set `RECOMMENDATION_IMAGE_CACHE_PUBLIC_READ=1` only when the bucket URL is the
+intended public MVP display URL. If the bucket is fronted by another CDN host,
+set `RECOMMENDATION_IMAGE_CDN_BASE_URL=https://<image-cdn-host>` before apply.
+
+Before setting the CDN base URL for staging seed promotion,
+generate the cache manifest locally:
+
+```bash
+python3 -m app.tools.beverage_image_cache_export \
+  --output-dir /private/tmp/recommendation-beverage-image-cache \
+  --manifest /private/tmp/recommendation-beverage-image-cache/manifest.json \
+  --gcs-bucket ontheblock-beverage-images-staging
+```
+
+When the manifest has been reviewed, mirror the licensed source images into the
+same output directory:
+
+```bash
+python3 -m app.tools.beverage_image_cache_export \
+  --download \
+  --output-dir /private/tmp/recommendation-beverage-image-cache \
+  --manifest /private/tmp/recommendation-beverage-image-cache/manifest.json \
+  --gcs-bucket ontheblock-beverage-images-staging
+```
+
+Upload the generated object tree to the image bucket:
+
+```bash
+gcloud storage cp -r \
+  /private/tmp/recommendation-beverage-image-cache/beverage-images \
+  gs://ontheblock-beverage-images-staging/
+```
+
+After the bucket is fronted by the chosen public URL or CDN, set:
+
+```text
+RECOMMENDATION_BEVERAGE_IMAGE_CDN_BASE_URL_SECRET=recommendation-beverage-image-cdn-base-url-staging
+```
+
+Then re-run the staging seed job so active beverage metadata uses the managed
+display URL while preserving original source/license metadata.
+
+```bash
+RECOMMENDATION_JOB_MODE=seed \
+RECOMMENDATION_BEVERAGE_IMAGE_CDN_BASE_URL_SECRET=recommendation-beverage-image-cdn-base-url-staging \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-run-staging-job.sh
+```
+
 When a safe deployed survey user or survey response is available, generate the
 derived staging profile through the deployed survey-service adapter:
 
@@ -241,6 +316,7 @@ After deployment, run:
 ```bash
 RECOMMENDATION_SMOKE_GRPC_ADDR=<cloud-run-host>:443 \
 SMOKE_AUTH_BEARER_TOKEN=<safe-staging-token> \
+SMOKE_SERVERLESS_AUTH_TOKEN=<google-id-token-for-private-cloud-run> \
 SMOKE_GRPC_TLS=1 \
 python3 -m app.tools.deployed_smoke --mode recommendation
 ```
@@ -252,6 +328,20 @@ RECOMMENDATION_SMOKE_EXPECT_ACTIVE_PROFILE=true
 RECOMMENDATION_SMOKE_RUN_BEVERAGE=true
 RECOMMENDATION_SMOKE_RECORD_EVENT=true
 ```
+
+For selected-beverage venue smoke with a place-type filter, also set:
+
+```text
+RECOMMENDATION_SMOKE_SELECTED_BEVERAGE_ID=<safe-beverage-uuid>
+RECOMMENDATION_SMOKE_LAT=37.5
+RECOMMENDATION_SMOKE_LNG=127.0
+RECOMMENDATION_SMOKE_VENUE_PLACE_TYPES=store
+RECOMMENDATION_SMOKE_EXPECT_VENUE_RESULTS=true
+RECOMMENDATION_SMOKE_VALIDATE_VENUE_CONTRACT=true
+```
+
+The smoke sends `place_types` through gRPC and validates that returned snapshot
+`place_type` values match the requested store/bar/outdoor contract.
 
 For the complete Plan 012 staging acceptance, use the guarded runner with a safe
 survey user and matching safe auth token:
@@ -272,3 +362,15 @@ response ID.
 
 The runner defaults `SMOKE_GRPC_TIMEOUT_SECONDS` to `30` for deployed Cloud Run
 gRPC cold starts.
+
+Production app traffic should not require `recommendation-service` to be public.
+Use:
+
+```text
+Flutter -> app-gateway-service -> private recommendation-service
+```
+
+The app-gateway runtime service account needs `roles/run.invoker` on
+`recommendation-service`. Gateway calls must preserve the user bearer token in
+`authorization` and send Cloud Run IAM separately through
+`x-serverless-authorization`.

@@ -164,6 +164,7 @@ Domain docs live here:
 | Kakao API policy | `integrations/kakao-api-policy.md` |
 | API contracts | `api/recommendation-api.md` |
 | Flutter recommendation handoff | `api/flutter-handoff.md` |
+| App gateway recommendation handoff | `api/app-gateway-handoff.md` |
 | PostgreSQL and Qdrant metadata model | `database/erd.md` |
 | Migration rules | `database/migration-strategy.md` |
 | Release gate | `operations/release-gate.md` |

@@ -8,15 +8,232 @@ option go_package = "github.com/ontheblock/infra/proto/auth/v1;authv1";
 
 import "google/protobuf/timestamp.proto";
 
-// Minimal auth-service contract consumed by recommendation-service.
-//
-// auth-service remains the canonical owner of users, roles, login state, and
-// JWT issuance. recommendation-service only validates bearer tokens and reads
-// public key metadata through service APIs.
+// AuthService exposes internal gRPC endpoints consumed by Gateway and other services.
+// REST endpoints are handled by Gateway which translates HTTP -> gRPC calls to this service.
 service AuthService {
+  // GoogleLogin verifies a Google ID Token, finds or creates the user,
+  // and returns a token pair. Called by Gateway for POST /auth/google.
+  rpc GoogleLogin(GoogleLoginRequest) returns (GoogleLoginResponse);
+
+  // CredentialLogin authenticates a managed user (ROLE_ADMIN, ROLE_BAR, ROLE_REQUE)
+  // with username and password, and returns a token pair.
+  // Called by Gateway for POST /auth/login.
+  rpc CredentialLogin(CredentialLoginRequest) returns (CredentialLoginResponse);
+
+  // AdminCreateUser creates a managed user account (ROLE_BAR or ROLE_REQUE).
+  // Only callable by ROLE_ADMIN. Called by Gateway for POST /auth/admin/users (JWT required).
+  rpc AdminCreateUser(AdminCreateUserRequest) returns (AdminCreateUserResponse);
+
+  // AdminUpdateUser updates a managed user account's password, username, or role.
+  // Only callable by ROLE_ADMIN. Called by Gateway for PATCH /auth/admin/users/{user_id} (JWT required).
+  rpc AdminUpdateUser(AdminUpdateUserRequest) returns (AdminUpdateUserResponse);
+
+  // AdminDeleteUser deactivates a managed user account.
+  // Only callable by ROLE_ADMIN. Called by Gateway for DELETE /auth/admin/users/{user_id} (JWT required).
+  rpc AdminDeleteUser(AdminDeleteUserRequest) returns (AdminDeleteUserResponse);
+
+  // AdminListUsers returns a paginated list of managed user accounts.
+  // Only callable by ROLE_ADMIN. Called by Gateway for GET /auth/admin/users (JWT required).
+  rpc AdminListUsers(AdminListUsersRequest) returns (AdminListUsersResponse);
+
+  // AdminGetUser returns a specific managed user account.
+  // Only callable by ROLE_ADMIN. Called by Gateway for GET /auth/admin/users/{user_id} (JWT required).
+  rpc AdminGetUser(AdminGetUserRequest) returns (AdminGetUserResponse);
+
+  // RefreshToken rotates the refresh token and returns a new token pair.
+  // Called by Gateway for POST /auth/refresh.
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
+
+  // GetMe returns the authenticated user's profile.
+  // Called by Gateway for GET /auth/me (JWT required).
+  rpc GetMe(GetMeRequest) returns (GetMeResponse);
+
+  // GetUser returns the public profile of any user by user_id.
+  // Used for displaying another user's profile card (e.g. chat room avatar tap).
+  // Returns only public fields: nickname, profile_image_url, alcohol_score.
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+
+  // Logout revokes all refresh tokens for the user.
+  // Called by Gateway for POST /auth/logout (JWT required).
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+
+  // ValidateToken validates a JWT and returns the claims.
+  // Called by other services for Zero Trust secondary validation.
   rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+
+  // UpdateSurveyData stores the encoded survey result (12-number string) and
+  // marks survey_completed = true. Called by Gateway after survey submission.
+  rpc UpdateSurveyData(UpdateSurveyDataRequest) returns (UpdateSurveyDataResponse);
+
+  // UpdateProfile sets the nickname and optionally the profile image URL for a user.
+  // Called after Google login onboarding. Called by Gateway for PATCH /auth/profile (JWT required).
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
+
+  // RotateKeys generates a new RSA key pair and retires the current one.
+  // The retired public key remains active for one access-token lifetime (grace period).
+  // Only callable by ROLE_ADMIN.
+  rpc RotateKeys(RotateKeysRequest) returns (RotateKeysResponse);
+
+  // GetPublicKeys returns all currently valid public keys (current + grace-period keys).
+  // Called by Gateway and other services to refresh their key cache after rotation.
   rpc GetPublicKeys(GetPublicKeysRequest) returns (GetPublicKeysResponse);
+
+  // GenerateProfileUploadUrl returns a V4 Signed URL for uploading a profile image to GCS.
+  // The client uploads directly to GCS with a PUT request, then passes the object URL to UpdateProfile.
+  rpc GenerateProfileUploadUrl(GenerateProfileUploadUrlRequest) returns (GenerateProfileUploadUrlResponse);
+
+  // UpdateNeighborhood stores the user's neighborhood (e.g. "수원시 장안구 율전동") from reverse geocoding.
+  rpc UpdateNeighborhood(UpdateNeighborhoodRequest) returns (UpdateNeighborhoodResponse);
+
+  // CompleteOnboarding marks onboarding_completed = true. Called once per account at end of onboarding.
+  rpc CompleteOnboarding(CompleteOnboardingRequest) returns (CompleteOnboardingResponse);
+
+  // UpdateAlcoholScore adds or subtracts from a user's alcohol_score, clamped to [0, 100].
+  // Called by other services (e.g. survey, review) after scoring events.
+  rpc UpdateAlcoholScore(UpdateAlcoholScoreRequest) returns (UpdateAlcoholScoreResponse);
+
+  // UpdatePoints adds or subtracts from a user's points balance. Points cannot go below 0.
+  // Called by other services (e.g. review, checkin) after point-earning or point-spending events.
+  rpc UpdatePoints(UpdatePointsRequest) returns (UpdatePointsResponse);
+
+  // IssueDebugToken issues a signed access token for a given user_id without Google OAuth.
+  // STAGING ONLY: active only when DEBUG_TOKEN_ENABLED=true on the auth-service.
+  // Must never be enabled in production.
+  rpc IssueDebugToken(IssueDebugTokenRequest) returns (IssueDebugTokenResponse);
 }
+
+// --- GoogleLogin ---
+
+message GoogleLoginRequest {
+  string id_token = 1; // Google ID Token from client
+}
+
+message GoogleLoginResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  google.protobuf.Timestamp access_token_expires_at = 3;
+  google.protobuf.Timestamp refresh_token_expires_at = 4;
+  UserResponse user = 5;
+  bool is_new_user = 6; // true if the user was created during this login
+}
+
+// --- CredentialLogin ---
+
+message CredentialLoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message CredentialLoginResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  google.protobuf.Timestamp access_token_expires_at = 3;
+  google.protobuf.Timestamp refresh_token_expires_at = 4;
+  UserResponse user = 5;
+}
+
+// --- AdminCreateUser ---
+
+message AdminCreateUserRequest {
+  string username = 1;
+  string password = 2;
+  Role role = 3; // must be ROLE_BAR or ROLE_REQUE; ROLE_ADMIN rejected by service layer
+}
+
+message AdminCreateUserResponse {
+  UserResponse user = 1;
+}
+
+// --- AdminUpdateUser ---
+
+message AdminUpdateUserRequest {
+  string user_id = 1;
+  optional string new_password = 2;
+  optional string new_username = 3;
+  optional Role new_role = 4; // only ROLE_BAR and ROLE_REQUE accepted; enforced at service layer
+}
+
+message AdminUpdateUserResponse {
+  UserResponse user = 1;
+}
+
+// --- AdminDeleteUser ---
+
+message AdminDeleteUserRequest {
+  string user_id = 1;
+}
+
+message AdminDeleteUserResponse {}
+
+// --- AdminListUsers ---
+
+message AdminListUsersRequest {
+  Role role_filter = 1; // ROLE_UNSPECIFIED returns all managed users
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message AdminListUsersResponse {
+  repeated UserResponse users = 1;
+  string next_page_token = 2;
+}
+
+// --- AdminGetUser ---
+
+message AdminGetUserRequest {
+  string user_id = 1;
+}
+
+message AdminGetUserResponse {
+  UserResponse user = 1;
+}
+
+// --- RefreshToken ---
+
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+message RefreshTokenResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  google.protobuf.Timestamp access_token_expires_at = 3;
+  google.protobuf.Timestamp refresh_token_expires_at = 4;
+  UserResponse user = 5;
+}
+
+// --- GetMe ---
+
+message GetMeRequest {
+  string user_id = 1;
+}
+
+message GetMeResponse {
+  UserResponse user = 1;
+}
+
+// --- GetUser ---
+
+message GetUserRequest {
+  string user_id = 1;
+}
+
+message GetUserResponse {
+  string user_id = 1;
+  string nickname = 2;
+  string profile_image_url = 3;
+  int32 alcohol_score = 4;
+}
+
+// --- Logout ---
+
+message LogoutRequest {
+  string user_id = 1;
+}
+
+message LogoutResponse {}
+
+// --- ValidateToken ---
 
 message ValidateTokenRequest {
   string access_token = 1;
@@ -28,9 +245,59 @@ message ValidateTokenResponse {
   string email = 3;
   Role role = 4;
   google.protobuf.Timestamp expires_at = 5;
-  string reason = 6;
+  string reason = 6; // failure reason: TOKEN_EXPIRED, TOKEN_INVALID, etc.
   string nickname = 7;
 }
+
+// --- UpdateSurveyData ---
+
+message UpdateSurveyDataRequest {
+  string user_id = 1;
+  string survey_id = 3; // survey_responses.id (UUID) from survey-service
+}
+
+message UpdateSurveyDataResponse {
+  UserResponse user = 1;
+}
+
+// --- UpdateProfile ---
+
+message UpdateProfileRequest {
+  string user_id = 1;
+  string nickname = 2;
+  string profile_image_url = 3; // optional: empty string means no change
+}
+
+message UpdateProfileResponse {
+  UserResponse user = 1;
+}
+
+// --- Shared types ---
+
+message UserResponse {
+  string user_id = 1;
+  string email = 2;
+  string nickname = 3;
+  string profile_image_url = 4;
+  Role role = 5;
+  google.protobuf.Timestamp created_at = 6;
+  string neighborhood = 7;
+  int32 alcohol_score = 8;
+  int32 points = 9;
+  string survey_id = 11; // survey_responses.id (UUID) from survey-service, empty if not completed
+  bool onboarding_completed = 12;
+}
+
+// --- RotateKeys ---
+
+message RotateKeysRequest {}
+
+message RotateKeysResponse {
+  string new_kid = 1;
+  string public_key_pem = 2;
+}
+
+// --- GetPublicKeys ---
 
 message GetPublicKeysRequest {}
 
@@ -44,10 +311,89 @@ message PublicKeyEntry {
   bool is_current = 3;
 }
 
+// --- GenerateProfileUploadUrl ---
+
+message GenerateProfileUploadUrlRequest {
+  string user_id = 1;
+}
+
+message GenerateProfileUploadUrlResponse {
+  string upload_url = 1; // V4 Signed URL for PUT (15 min TTL)
+  string object_url = 2; // public GCS object URL to store in profile_image_url
+}
+
+// --- UpdateNeighborhood ---
+
+message UpdateNeighborhoodRequest {
+  string user_id = 1;
+  string neighborhood = 2;
+}
+
+message UpdateNeighborhoodResponse {
+  UserResponse user = 1;
+}
+
+// --- CompleteOnboarding ---
+
+message CompleteOnboardingRequest {
+  string user_id = 1;
+}
+
+message CompleteOnboardingResponse {
+  UserResponse user = 1;
+}
+
+// --- UpdateAlcoholScore ---
+
+message UpdateAlcoholScoreRequest {
+  string user_id = 1;
+  ScoreOperation operation = 2;
+  int32 delta = 3; // amount to add or subtract (positive integer)
+}
+
+message UpdateAlcoholScoreResponse {
+  UserResponse user = 1;
+}
+
+// --- UpdatePoints ---
+
+message UpdatePointsRequest {
+  string user_id = 1;
+  ScoreOperation operation = 2;
+  int32 amount = 3; // amount to add or subtract (positive integer)
+}
+
+message UpdatePointsResponse {
+  UserResponse user = 1;
+}
+
+enum ScoreOperation {
+  SCORE_OPERATION_UNSPECIFIED = 0;
+  SCORE_OPERATION_ADD = 1;
+  SCORE_OPERATION_SUBTRACT = 2;
+}
+
+// --- IssueDebugToken ---
+
+message IssueDebugTokenRequest {
+  string user_id = 1;
+}
+
+message IssueDebugTokenResponse {
+  string access_token = 1;
+  string user_id = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+
 enum Role {
   ROLE_UNSPECIFIED = 0;
   ROLE_NORMAL = 1;
   ROLE_ADMIN = 2;
   ROLE_BAR = 3;
   ROLE_REQUE = 4;
+}
+
+enum Provider {
+  PROVIDER_UNSPECIFIED = 0;
+  PROVIDER_GOOGLE = 1;
 }

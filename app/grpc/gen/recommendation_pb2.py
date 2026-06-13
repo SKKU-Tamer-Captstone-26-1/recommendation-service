@@ -81,6 +81,31 @@ _enum(
 )
 _enum(
     _file,
+    "BeverageDiversityMode",
+    (
+        "BEVERAGE_DIVERSITY_MODE_UNSPECIFIED",
+        "BEVERAGE_DIVERSITY_MODE_STANDARD",
+        "BEVERAGE_DIVERSITY_MODE_DIFFERENT",
+        "BEVERAGE_DIVERSITY_MODE_ADJACENT",
+    ),
+)
+_enum(
+    _file,
+    "BeverageFlavorDirection",
+    (
+        "BEVERAGE_FLAVOR_DIRECTION_UNSPECIFIED",
+        "BEVERAGE_FLAVOR_DIRECTION_SWEETER",
+        "BEVERAGE_FLAVOR_DIRECTION_LESS_SWEET",
+        "BEVERAGE_FLAVOR_DIRECTION_SMOKIER",
+        "BEVERAGE_FLAVOR_DIRECTION_LESS_SMOKY",
+        "BEVERAGE_FLAVOR_DIRECTION_LIGHTER",
+        "BEVERAGE_FLAVOR_DIRECTION_RICHER",
+        "BEVERAGE_FLAVOR_DIRECTION_MORE_HERBAL_BITTER",
+        "BEVERAGE_FLAVOR_DIRECTION_BRIGHTER_FRUITY",
+    ),
+)
+_enum(
+    _file,
     "RecommendationEventType",
     (
         "RECOMMENDATION_EVENT_TYPE_UNSPECIFIED",
@@ -169,6 +194,34 @@ _add_field(
     _descriptor_pb2.FieldDescriptorProto.TYPE_ENUM,
     type_name=".ontheblock.recommendation.v1.BudgetMode",
 )
+_add_field(
+    _bev_request,
+    "exclude_beverage_ids",
+    4,
+    _descriptor_pb2.FieldDescriptorProto.TYPE_STRING,
+    label=_descriptor_pb2.FieldDescriptorProto.LABEL_REPEATED,
+)
+_add_field(
+    _bev_request,
+    "exclude_result_ids",
+    5,
+    _descriptor_pb2.FieldDescriptorProto.TYPE_STRING,
+    label=_descriptor_pb2.FieldDescriptorProto.LABEL_REPEATED,
+)
+_add_field(
+    _bev_request,
+    "diversity_mode",
+    6,
+    _descriptor_pb2.FieldDescriptorProto.TYPE_ENUM,
+    type_name=".ontheblock.recommendation.v1.BeverageDiversityMode",
+)
+_add_field(
+    _bev_request,
+    "flavor_direction",
+    7,
+    _descriptor_pb2.FieldDescriptorProto.TYPE_ENUM,
+    type_name=".ontheblock.recommendation.v1.BeverageFlavorDirection",
+)
 
 _bev_result = _message(_file, "BeverageRecommendation")
 _add_field(_bev_result, "rank", 1, _descriptor_pb2.FieldDescriptorProto.TYPE_INT32)
@@ -240,6 +293,13 @@ _add_field(
     6,
     _descriptor_pb2.FieldDescriptorProto.TYPE_ENUM,
     type_name=".ontheblock.recommendation.v1.BudgetMode",
+)
+_add_field(
+    _venue_request,
+    "place_types",
+    7,
+    _descriptor_pb2.FieldDescriptorProto.TYPE_STRING,
+    label=_descriptor_pb2.FieldDescriptorProto.LABEL_REPEATED,
 )
 
 _venue_result = _message(_file, "VenueRecommendation")

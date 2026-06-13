@@ -105,6 +105,24 @@ Recommended `metadata_json` keys:
     "observation_count": 1,
     "price_min_krw": 39000,
     "price_max_krw": 39000
+  },
+  "image_url": "https://commons.wikimedia.org/wiki/Special:FilePath/Glass_of_whisky.jpg",
+  "image": {
+    "policy_version": "beverage_image_v1",
+    "image_kind": "category_representative",
+    "image_url": "https://commons.wikimedia.org/wiki/Special:FilePath/Glass_of_whisky.jpg",
+    "original_image_url": "https://commons.wikimedia.org/wiki/Special:FilePath/Glass_of_whisky.jpg",
+    "cache_key": "beverage-images/v1/bev_image_whiskey_category_representative_001.jpg",
+    "cache_policy": "operator_managed_image_cache_v1",
+    "display_url_source": "licensed_source_url",
+    "alt_text_ko": "위스키 잔 대표 이미지",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Glass_of_whisky.jpg",
+    "source_type": "wikimedia_commons",
+    "license": "Public Domain",
+    "attribution": "Chris huh / Wikimedia Commons",
+    "attribution_required": false,
+    "display_policy": "allowed_mvp_display_with_license_metadata",
+    "review_status": "source_checked_mvp_seed"
   }
 }
 ```
@@ -117,6 +135,89 @@ evidence after human review. They are useful for display, explanation, and weak
 budget context, but they MUST NOT be presented as a live offer, venue menu
 price, inventory truth, or strict budget-filter source. Live venue/menu prices
 remain owned by map-service/place-service snapshots.
+
+`image_url` and `image` are display metadata only. They MUST NOT affect ranking,
+flavor vectors, budget fit, inventory, or recommendation reason codes. MVP image
+rows use category representative assets when no direct image has passed source
+review. A direct product or cocktail representative image can replace the
+category fallback only when the source page has reusable license, source URL,
+attribution, and review metadata. Official marketing packshots and retailer
+thumbnails still require operator/legal review.
+
+`metadata_json.image_url` is the app display URL. When
+`BEVERAGE_IMAGE_CDN_BASE_URL` is unset during seed promotion, it may be the
+licensed source image URL. When the variable is set, the seed importer rewrites
+`metadata_json.image_url` and `metadata_json.image.image_url` to an
+ONTHEBLOCK-managed cache/CDN URL derived from `metadata_json.image.cache_key`.
+The original licensed image URL remains in `metadata_json.image.original_image_url`
+and the license source page remains in `metadata_json.image.source_url`.
+
+Supported MVP `image_kind` values:
+
+```text
+category_representative
+licensed_product_representative
+licensed_cocktail_representative
+```
+
+`licensed_product_representative` and `licensed_cocktail_representative` mean
+"source-checked display image", not live inventory, not a venue offer, and not a
+recommendation quality signal.
+
+Every active MVP beverage MUST have app-display image metadata before release:
+
+```text
+metadata_json.image_url
+metadata_json.image_alt_text_ko
+metadata_json.image.policy_version
+metadata_json.image.image_candidate_id
+metadata_json.image.image_kind
+metadata_json.image.image_url
+metadata_json.image.original_image_url
+metadata_json.image.cache_key
+metadata_json.image.cache_policy
+metadata_json.image.display_url_source
+metadata_json.image.source_url
+metadata_json.image.source_type
+metadata_json.image.license
+metadata_json.image.license_url
+metadata_json.image.attribution
+metadata_json.image.attribution_required
+metadata_json.image.display_policy
+metadata_json.image.review_status
+```
+
+The local release gate treats missing or invalid display image metadata as a
+critical beverage catalog audit failure. This guarantees Flutter can display a
+network image for every active recommendation candidate while preserving license
+and attribution metadata for detail or credits surfaces.
+
+The seed importer also validates image candidates before promotion:
+
+```text
+source_type must be approved for MVP display
+image_url, source_url, and license_url must be HTTPS URLs
+direct images must reference an existing beverage_candidate_id
+direct image category must match the catalog candidate category
+category fallback images must be unique per category
+direct images must be unique per beverage candidate
+attribution_required must be an explicit boolean
+```
+
+Before staging/production uses `BEVERAGE_IMAGE_CDN_BASE_URL`, export the cache
+manifest:
+
+```bash
+python3 -m app.tools.beverage_image_cache_export \
+  --output-dir /private/tmp/recommendation-beverage-image-cache \
+  --manifest /private/tmp/recommendation-beverage-image-cache/manifest.json \
+  --gcs-bucket ontheblock-beverage-images-staging
+```
+
+Use `--download` only when an operator is ready to mirror the licensed source
+images into the local export directory before uploading them to GCS. The export
+manifest is the audit bridge between recommendation catalog metadata and the
+operator-managed image cache. It is not recommendation scoring evidence.
 
 ## Beverage Taste Profile
 

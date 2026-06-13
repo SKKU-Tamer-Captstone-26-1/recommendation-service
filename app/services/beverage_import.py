@@ -3,11 +3,13 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote, unquote, urlparse
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -30,6 +32,22 @@ SEED_VERSION = "canonical_beverage_seed_v1"
 SEED_NAMESPACE = uuid.UUID("6ad0a869-203c-56cb-95b9-c11a9416eb35")
 STAGING_NAMESPACE = uuid.UUID("2020c0be-0d4a-53b0-a6cd-37e85f7bffcf")
 PRICE_POLICY = "verified_krw_observations_not_live_truth"
+ALLOWED_IMAGE_SOURCE_TYPES = frozenset({"wikimedia_commons"})
+ALLOWED_IMAGE_KINDS = frozenset(
+    {
+        "category_representative",
+        "licensed_product_representative",
+        "licensed_cocktail_representative",
+    },
+)
+ALLOWED_IMAGE_DISPLAY_POLICIES = frozenset(
+    {"allowed_mvp_display_with_license_metadata"},
+)
+ALLOWED_IMAGE_REVIEW_STATUSES = frozenset(
+    {"source_checked_mvp_seed", "operator_approved"},
+)
+IMAGE_CACHE_POLICY = "operator_managed_image_cache_v1"
+IMAGE_CACHE_KEY_PREFIX = "beverage-images/v1"
 
 MVP_SEED_CANDIDATE_IDS: tuple[str, ...] = (
     "bev_cand_beer_guinness_draught",
@@ -107,6 +125,7 @@ class CandidateArtifacts:
     knowledge_rows: dict[str, dict[str, Any]]
     price_rows: dict[str, dict[str, Any]]
     source_rows: dict[str, dict[str, Any]]
+    image_rows: dict[str, dict[str, Any]]
 
 
 @dataclass(frozen=True)
@@ -132,9 +151,16 @@ class CanonicalSeedRecord:
 class BeverageCandidateImporter:
     """Stages reviewed artifacts and promotes the fixed MVP seed subset."""
 
-    def __init__(self, session: Session, data_dir: Path) -> None:
+    def __init__(
+        self,
+        session: Session,
+        data_dir: Path,
+        *,
+        image_cdn_base_url: str | None = None,
+    ) -> None:
         self._session = session
         self._data_dir = data_dir
+        self._image_cdn_base_url = image_cdn_base_url
 
     def load_artifacts(self) -> CandidateArtifacts:
         return load_candidate_artifacts(self._data_dir)
@@ -189,6 +215,7 @@ class BeverageCandidateImporter:
         records = build_canonical_seed_records(
             artifacts=artifacts,
             vector_schema_version_id=vector_schema.id,
+            image_cdn_base_url=self._image_cdn_base_url,
         )
         for record in records:
             self._session.merge(record.beverage)
@@ -221,6 +248,11 @@ def load_candidate_artifacts(data_dir: Path) -> CandidateArtifacts:
         "price_observation_id",
     )
     source = _index_by(_read_csv(data_dir / "source_registry.csv"), "source_id")
+    images = _index_by(
+        _read_jsonl(data_dir / "image_candidates.jsonl"),
+        "image_candidate_id",
+    )
+    _validate_image_candidates(images, catalog)
     return CandidateArtifacts(
         manifest=manifest,
         catalog_rows=catalog,
@@ -228,6 +260,7 @@ def load_candidate_artifacts(data_dir: Path) -> CandidateArtifacts:
         knowledge_rows=knowledge,
         price_rows=price,
         source_rows=source,
+        image_rows=images,
     )
 
 
@@ -235,7 +268,9 @@ def build_canonical_seed_records(
     *,
     artifacts: CandidateArtifacts,
     vector_schema_version_id: uuid.UUID,
+    image_cdn_base_url: str | None = None,
 ) -> tuple[CanonicalSeedRecord, ...]:
+    normalized_image_cdn_base_url = _normalize_image_cdn_base_url(image_cdn_base_url)
     source_urls = {row["url"] for row in artifacts.source_rows.values()}
     records: list[CanonicalSeedRecord] = []
     for candidate_id in MVP_SEED_CANDIDATE_IDS:
@@ -279,6 +314,11 @@ def build_canonical_seed_records(
             reason_hints,
             price_observations,
             price_summary,
+            _image_metadata_for_candidate(
+                artifacts.image_rows,
+                catalog,
+                image_cdn_base_url=normalized_image_cdn_base_url,
+            ),
         )
 
         beverage = BeverageItem(
@@ -527,6 +567,147 @@ def _validate_source_coverage(
         raise BeverageImportError(f"source URLs missing from registry: {missing}")
 
 
+def _validate_image_candidates(
+    image_rows: dict[str, dict[str, Any]],
+    catalog_rows: dict[str, dict[str, Any]],
+) -> None:
+    category_fallbacks: dict[str, str] = {}
+    direct_images: dict[str, str] = {}
+
+    for row in image_rows.values():
+        image_candidate_id = row["image_candidate_id"]
+        _validate_image_candidate_required_fields(row)
+        _validate_image_candidate_enums(row)
+        _validate_image_candidate_urls(row)
+
+        if not isinstance(row.get("attribution_required"), bool):
+            raise BeverageImportError(
+                f"image candidate {image_candidate_id} "
+                "must define boolean attribution_required",
+            )
+
+        category = row["category"]
+        image_kind = row["image_kind"]
+        beverage_candidate_id = row.get("beverage_candidate_id")
+
+        if image_kind == "category_representative":
+            if beverage_candidate_id:
+                raise BeverageImportError(
+                    f"category image {image_candidate_id} must not define "
+                    "beverage_candidate_id",
+                )
+            previous = category_fallbacks.get(category)
+            if previous is not None:
+                raise BeverageImportError(
+                    "duplicate category representative image for "
+                    f"{category}: {previous}, {image_candidate_id}",
+                )
+            category_fallbacks[category] = image_candidate_id
+            continue
+
+        if not isinstance(beverage_candidate_id, str) or not beverage_candidate_id:
+            raise BeverageImportError(
+                f"direct image {image_candidate_id} must define "
+                "beverage_candidate_id",
+            )
+        catalog = catalog_rows.get(beverage_candidate_id)
+        if catalog is None:
+            raise BeverageImportError(
+                f"direct image {image_candidate_id} references unknown "
+                f"beverage_candidate_id={beverage_candidate_id}",
+            )
+        if catalog.get("category") != category:
+            raise BeverageImportError(
+                f"direct image {image_candidate_id} category does not match "
+                f"catalog category for {beverage_candidate_id}",
+            )
+        previous = direct_images.get(beverage_candidate_id)
+        if previous is not None:
+            raise BeverageImportError(
+                "duplicate direct image for "
+                f"{beverage_candidate_id}: {previous}, {image_candidate_id}",
+            )
+        direct_images[beverage_candidate_id] = image_candidate_id
+
+    seed_categories = {
+        catalog_rows[candidate_id]["category"]
+        for candidate_id in MVP_SEED_CANDIDATE_IDS
+        if candidate_id in catalog_rows
+    }
+    missing_fallback_categories = sorted(
+        category for category in seed_categories if category not in category_fallbacks
+    )
+    if missing_fallback_categories:
+        raise BeverageImportError(
+            "missing category representative image for seed categories: "
+            f"{missing_fallback_categories}",
+        )
+
+
+def _validate_image_candidate_required_fields(row: dict[str, Any]) -> None:
+    required_string_fields = (
+        "image_candidate_id",
+        "category",
+        "image_kind",
+        "image_url",
+        "source_url",
+        "source_type",
+        "license",
+        "license_url",
+        "attribution",
+        "display_policy",
+        "review_status",
+        "alt_text_ko",
+    )
+    missing = [
+        field
+        for field in required_string_fields
+        if not isinstance(row.get(field), str) or not row.get(field)
+    ]
+    if missing:
+        image_candidate_id = row.get("image_candidate_id", "<unknown>")
+        raise BeverageImportError(
+            f"image candidate {image_candidate_id} is missing fields: {missing}",
+        )
+
+
+def _validate_image_candidate_enums(row: dict[str, Any]) -> None:
+    image_candidate_id = row["image_candidate_id"]
+    if row["source_type"] not in ALLOWED_IMAGE_SOURCE_TYPES:
+        raise BeverageImportError(
+            f"image candidate {image_candidate_id} has unsupported source_type: "
+            f"{row['source_type']}",
+        )
+    if row["image_kind"] not in ALLOWED_IMAGE_KINDS:
+        raise BeverageImportError(
+            f"image candidate {image_candidate_id} has unsupported image_kind: "
+            f"{row['image_kind']}",
+        )
+    if row["display_policy"] not in ALLOWED_IMAGE_DISPLAY_POLICIES:
+        raise BeverageImportError(
+            f"image candidate {image_candidate_id} has unsupported display_policy: "
+            f"{row['display_policy']}",
+        )
+    if row["review_status"] not in ALLOWED_IMAGE_REVIEW_STATUSES:
+        raise BeverageImportError(
+            f"image candidate {image_candidate_id} has unsupported review_status: "
+            f"{row['review_status']}",
+        )
+
+
+def _validate_image_candidate_urls(row: dict[str, Any]) -> None:
+    image_candidate_id = row["image_candidate_id"]
+    for field in ("image_url", "source_url", "license_url"):
+        if not _is_https_url(row[field]):
+            raise BeverageImportError(
+                f"image candidate {image_candidate_id} {field} must be https URL",
+            )
+
+
+def _is_https_url(value: str) -> bool:
+    return value.startswith("https://") and "." in value
+
+
 def _normalize_dimension_confidence(flavor: dict[str, Any]) -> dict[str, float]:
     confidence = flavor.get("dimension_confidence_json") or {}
     fallback = float(confidence.get("all_other_dimensions", 0.45))
@@ -609,8 +790,9 @@ def _catalog_metadata(
     reason_hints: list[str],
     price_observations: list[dict[str, Any]],
     price_summary: dict[str, Any],
+    image_metadata: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    return {
+    metadata = {
         "catalog_key": catalog_key,
         "source_candidate_id": catalog["beverage_candidate_id"],
         "style": catalog.get("style"),
@@ -632,6 +814,149 @@ def _catalog_metadata(
         "price_observation_summary": price_summary,
         "price_observations": price_observations,
     }
+    if image_metadata is not None:
+        metadata.update(
+            {
+                "image": image_metadata,
+                "image_url": image_metadata["image_url"],
+                "image_alt_text_ko": image_metadata["alt_text_ko"],
+                "image_source_url": image_metadata["source_url"],
+                "image_license": image_metadata["license"],
+                "image_attribution": image_metadata["attribution"],
+                "image_display_policy": image_metadata["display_policy"],
+                "image_kind": image_metadata["image_kind"],
+                "image_review_status": image_metadata["review_status"],
+                "image_policy_version": image_metadata["policy_version"],
+            },
+        )
+    return metadata
+
+
+def _image_metadata_for_candidate(
+    image_rows: dict[str, dict[str, Any]],
+    catalog: dict[str, Any],
+    *,
+    image_cdn_base_url: str | None,
+) -> dict[str, Any] | None:
+    candidate_id = catalog["beverage_candidate_id"]
+    category = catalog["category"]
+    direct_rows = [
+        row
+        for row in image_rows.values()
+        if row.get("beverage_candidate_id") == candidate_id
+    ]
+    category_rows = [
+        row
+        for row in image_rows.values()
+        if row.get("category") == category
+        and row.get("image_kind") == "category_representative"
+    ]
+    row = next(
+        iter(sorted(direct_rows, key=lambda value: value["image_candidate_id"])),
+        None,
+    )
+    if row is None:
+        row = next(
+            iter(sorted(category_rows, key=lambda value: value["image_candidate_id"])),
+            None,
+        )
+    if row is None:
+        return None
+    return _canonical_image_metadata(row, image_cdn_base_url=image_cdn_base_url)
+
+
+def _canonical_image_metadata(
+    row: dict[str, Any],
+    *,
+    image_cdn_base_url: str | None,
+) -> dict[str, Any]:
+    required_string_fields = (
+        "image_candidate_id",
+        "image_kind",
+        "image_url",
+        "source_url",
+        "source_type",
+        "license",
+        "license_url",
+        "attribution",
+        "display_policy",
+        "review_status",
+        "alt_text_ko",
+    )
+    missing = [
+        field
+        for field in required_string_fields
+        if not isinstance(row.get(field), str) or not row.get(field)
+    ]
+    if missing:
+        raise BeverageImportError(
+            f"image candidate is missing required fields: {missing}",
+        )
+    original_image_url = row["image_url"]
+    cache_key = _image_cache_key(row["image_candidate_id"], original_image_url)
+    if image_cdn_base_url is None:
+        display_image_url = original_image_url
+        display_url_source = "licensed_source_url"
+    else:
+        display_image_url = _cached_image_url(image_cdn_base_url, cache_key)
+        display_url_source = "operator_managed_cache"
+    return {
+        "policy_version": "beverage_image_v1",
+        "image_candidate_id": row["image_candidate_id"],
+        "image_kind": row["image_kind"],
+        "image_url": display_image_url,
+        "original_image_url": original_image_url,
+        "cache_key": cache_key,
+        "cache_policy": IMAGE_CACHE_POLICY,
+        "display_url_source": display_url_source,
+        "alt_text_ko": row["alt_text_ko"],
+        "source_url": row["source_url"],
+        "source_type": row["source_type"],
+        "license": row["license"],
+        "license_url": row["license_url"],
+        "attribution": row["attribution"],
+        "attribution_required": bool(row.get("attribution_required", True)),
+        "display_policy": row["display_policy"],
+        "review_status": row["review_status"],
+        "notes": row.get("notes"),
+    }
+
+
+def _normalize_image_cdn_base_url(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip().rstrip("/")
+    if not normalized:
+        return None
+    if not _is_https_url(normalized):
+        raise BeverageImportError("image CDN base URL must be an https URL")
+    return normalized
+
+
+def _image_cache_key(image_candidate_id: str, original_image_url: str) -> str:
+    extension = _image_url_extension(original_image_url)
+    safe_candidate_id = _safe_cache_key_part(image_candidate_id)
+    return f"{IMAGE_CACHE_KEY_PREFIX}/{safe_candidate_id}{extension}"
+
+
+def _cached_image_url(image_cdn_base_url: str, cache_key: str) -> str:
+    return f"{image_cdn_base_url}/{quote(cache_key, safe='/')}"
+
+
+def _image_url_extension(original_image_url: str) -> str:
+    parsed = urlparse(original_image_url)
+    filename = unquote(Path(parsed.path).name)
+    suffix = Path(filename).suffix.lower()
+    if suffix in {".jpg", ".jpeg", ".png", ".webp", ".svg", ".gif"}:
+        return suffix
+    return ".jpg"
+
+
+def _safe_cache_key_part(value: str) -> str:
+    safe = re.sub(r"[^a-zA-Z0-9_.-]+", "-", value.strip()).strip("-")
+    if not safe:
+        raise BeverageImportError("image cache key cannot be empty")
+    return safe
 
 
 def _price_observations_for_candidate(

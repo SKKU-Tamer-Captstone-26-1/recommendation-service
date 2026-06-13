@@ -8,11 +8,15 @@ import grpc
 from google.protobuf import json_format
 from sqlalchemy.orm import Session
 
+from app.core.config import Settings, get_settings
 from app.grpc.gen import recommendation_pb2, recommendation_pb2_grpc
 from app.services.auth import AuthContextResolver, AuthError, metadata_to_dict
+from app.services.map_route_distance import create_http_map_route_distance_client
 from app.services.recommendations import (
     BeverageRecommendationService,
     RecommendationPreconditionError,
+    VenueDistanceProvider,
+    create_venue_distance_provider,
 )
 from app.services.runtime_metrics import runtime_metrics
 
@@ -22,16 +26,31 @@ class RecommendationGrpcServicer(recommendation_pb2_grpc.RecommendationServiceSe
         self,
         session_factory: Callable[[], Session],
         auth_resolver: AuthContextResolver,
+        settings: Settings | None = None,
+        venue_distance_provider: VenueDistanceProvider | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._auth_resolver = auth_resolver
+        self._settings = settings or get_settings()
+        route_client = (
+            create_http_map_route_distance_client(self._settings)
+            if self._settings.map_route_distance_enabled
+            else None
+        )
+        self._venue_distance_provider = (
+            venue_distance_provider
+            or create_venue_distance_provider(
+                self._settings,
+                route_client=route_client,
+            )
+        )
 
     def GetProfileStatus(self, request, context):
         started_at = perf_counter()
         try:
             external_user_id = self._resolve_external_user_id(context)
             with self._session_factory() as session:
-                service = BeverageRecommendationService(session)
+                service = self._recommendation_service(session)
                 status = service.get_profile_status(external_user_id)
                 response = recommendation_pb2.GetProfileStatusResponse(
                     status=_profile_status_to_proto(status.status),
@@ -53,13 +72,23 @@ class RecommendationGrpcServicer(recommendation_pb2_grpc.RecommendationServiceSe
         try:
             external_user_id = self._resolve_external_user_id(context)
             budget_mode = _budget_mode_from_proto(request.budget_mode)
+            diversity_mode = _beverage_diversity_mode_from_proto(
+                request.diversity_mode,
+            )
+            flavor_direction = _beverage_flavor_direction_from_proto(
+                request.flavor_direction,
+            )
             session = self._session_factory()
-            service = BeverageRecommendationService(session)
+            service = self._recommendation_service(session)
             response = service.get_beverage_recommendations(
                 external_user_id=external_user_id,
                 category=request.category or None,
                 limit=request.limit or None,
                 budget_mode=budget_mode,
+                exclude_beverage_ids=list(request.exclude_beverage_ids),
+                exclude_result_ids=list(request.exclude_result_ids),
+                diversity_mode=diversity_mode,
+                flavor_direction=flavor_direction,
             )
             session.commit()
             _record_grpc_status("GetBeverageRecommendations", "ok", started_at)
@@ -80,6 +109,15 @@ class RecommendationGrpcServicer(recommendation_pb2_grpc.RecommendationServiceSe
                 started_at,
             )
             context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(exc))
+        except ValueError as exc:
+            if session is not None:
+                session.rollback()
+            _record_grpc_status(
+                "GetBeverageRecommendations",
+                "invalid_argument",
+                started_at,
+            )
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
         except Exception:
             if session is not None:
                 session.rollback()
@@ -96,7 +134,7 @@ class RecommendationGrpcServicer(recommendation_pb2_grpc.RecommendationServiceSe
             external_user_id = self._resolve_external_user_id(context)
             budget_mode = _budget_mode_from_proto(request.budget_mode)
             session = self._session_factory()
-            service = BeverageRecommendationService(session)
+            service = self._recommendation_service(session)
             response = service.get_venue_recommendations(
                 external_user_id=external_user_id,
                 selected_beverage_id=request.selected_beverage_id,
@@ -105,6 +143,7 @@ class RecommendationGrpcServicer(recommendation_pb2_grpc.RecommendationServiceSe
                 radius_m=request.radius_m or None,
                 limit=request.limit or None,
                 budget_mode=budget_mode,
+                place_types=tuple(request.place_types),
             )
             session.commit()
             _record_grpc_status("GetVenueRecommendations", "ok", started_at)
@@ -154,7 +193,7 @@ class RecommendationGrpcServicer(recommendation_pb2_grpc.RecommendationServiceSe
             )
             result_id = uuid.UUID(request.result_id) if request.result_id else None
             session = self._session_factory()
-            service = BeverageRecommendationService(session)
+            service = self._recommendation_service(session)
             response = service.record_interaction(
                 request_id=uuid.UUID(request.request_id),
                 result_id=result_id,
@@ -194,6 +233,16 @@ class RecommendationGrpcServicer(recommendation_pb2_grpc.RecommendationServiceSe
         except AuthError as exc:
             context.abort(grpc.StatusCode.UNAUTHENTICATED, str(exc))
 
+    def _recommendation_service(
+        self,
+        session: Session,
+    ) -> BeverageRecommendationService:
+        return BeverageRecommendationService(
+            session,
+            active_scoring_config=self._settings.active_scoring_config,
+            venue_distance_provider=self._venue_distance_provider,
+        )
+
 
 def _recommendation_to_proto(item):
     message = recommendation_pb2.BeverageRecommendation(
@@ -207,8 +256,12 @@ def _recommendation_to_proto(item):
         reason_codes=item.reason_codes,
         explanation=item.explanation,
     )
+    image_metadata = item.source_metadata.get("image") or {}
     metadata = {
         "style": item.style or "",
+        "image_url": item.source_metadata.get("image_url") or "",
+        "image_alt_text_ko": item.source_metadata.get("image_alt_text_ko") or "",
+        "image": image_metadata,
         "similarity_score": item.similarity_score,
         "score_breakdown": item.score_breakdown,
         "source": item.source_metadata,
@@ -257,6 +310,41 @@ def _budget_mode_from_proto(value: int) -> str:
     if value == recommendation_pb2.BUDGET_MODE_STRICT:
         return "strict"
     return "soft"
+
+
+def _beverage_diversity_mode_from_proto(value: int) -> str:
+    if value in {
+        recommendation_pb2.BEVERAGE_DIVERSITY_MODE_UNSPECIFIED,
+        recommendation_pb2.BEVERAGE_DIVERSITY_MODE_STANDARD,
+    }:
+        return "standard"
+    if value == recommendation_pb2.BEVERAGE_DIVERSITY_MODE_DIFFERENT:
+        return "different"
+    if value == recommendation_pb2.BEVERAGE_DIVERSITY_MODE_ADJACENT:
+        return "adjacent"
+    raise ValueError("unsupported beverage diversity mode")
+
+
+def _beverage_flavor_direction_from_proto(value: int) -> str | None:
+    if value == recommendation_pb2.BEVERAGE_FLAVOR_DIRECTION_UNSPECIFIED:
+        return None
+    direction = {
+        recommendation_pb2.BEVERAGE_FLAVOR_DIRECTION_SWEETER: "sweeter",
+        recommendation_pb2.BEVERAGE_FLAVOR_DIRECTION_LESS_SWEET: "less_sweet",
+        recommendation_pb2.BEVERAGE_FLAVOR_DIRECTION_SMOKIER: "smokier",
+        recommendation_pb2.BEVERAGE_FLAVOR_DIRECTION_LESS_SMOKY: "less_smoky",
+        recommendation_pb2.BEVERAGE_FLAVOR_DIRECTION_LIGHTER: "lighter",
+        recommendation_pb2.BEVERAGE_FLAVOR_DIRECTION_RICHER: "richer",
+        recommendation_pb2.BEVERAGE_FLAVOR_DIRECTION_MORE_HERBAL_BITTER: (
+            "more_herbal_bitter"
+        ),
+        recommendation_pb2.BEVERAGE_FLAVOR_DIRECTION_BRIGHTER_FRUITY: (
+            "brighter_fruity"
+        ),
+    }.get(value)
+    if direction is None:
+        raise ValueError("unsupported beverage flavor direction")
+    return direction
 
 
 def _event_type_from_proto(value: int) -> str:

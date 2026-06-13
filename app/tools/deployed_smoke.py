@@ -12,7 +12,15 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--mode",
-        choices=("all", "auth", "survey", "map", "recommendation", "chat"),
+        choices=(
+            "all",
+            "auth",
+            "survey",
+            "map",
+            "map_route",
+            "recommendation",
+            "chat",
+        ),
         default="all",
     )
     parser.add_argument("--json", action="store_true")

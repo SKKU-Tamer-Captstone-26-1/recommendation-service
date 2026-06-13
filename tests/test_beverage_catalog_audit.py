@@ -34,6 +34,16 @@ def test_current_seed_subset_passes_critical_catalog_audit() -> None:
     assert report.metrics["reason_code_coverage"] >= 0.95
     assert report.metrics["alias_coverage"] >= 0.95
     assert report.metrics["style_coverage"] == 1.0
+    assert report.metrics["image_url_coverage"] == 1.0
+    assert report.metrics["image_metadata_coverage"] == 1.0
+    assert report.metrics["image_license_metadata_coverage"] == 1.0
+    assert report.metrics["image_cache_metadata_coverage"] == 1.0
+    assert report.metrics["image_kind_counts"] == {
+        "category_representative": 48,
+        "licensed_cocktail_representative": 5,
+        "licensed_product_representative": 7,
+    }
+    assert report.metrics["image_policy_counts"] == {"beverage_image_v1": 60}
     assert report.metrics["category_counts"] == {
         "beer": 5,
         "brandy_cognac": 5,
@@ -90,6 +100,36 @@ def test_catalog_audit_detects_bad_vector_dimensions() -> None:
     assert "missing_confidence_json_dimensions" in codes
 
 
+def test_catalog_audit_detects_missing_display_image_metadata() -> None:
+    metadata = _base_metadata()
+    for key in (
+        "image",
+        "image_url",
+        "image_alt_text_ko",
+        "image_source_url",
+        "image_license",
+        "image_attribution",
+        "image_display_policy",
+        "image_kind",
+        "image_review_status",
+        "image_policy_version",
+    ):
+        metadata.pop(key, None)
+    beverage = _beverage(metadata=metadata)
+
+    report = audit_catalog_rows(
+        beverages=(beverage,),
+        vectors=(_vector(beverage.id),),
+        flavor_profiles=(_flavor_profile(beverage.id),),
+        source="test",
+    )
+
+    codes = {issue.code for issue in report.issues if issue.severity == CRITICAL}
+    assert "missing_display_image" in codes
+    assert "missing_image_alt_text_ko" in codes
+    assert "missing_image_metadata" in codes
+
+
 def test_catalog_audit_detects_duplicate_catalog_keys() -> None:
     first = _beverage(catalog_key="whiskey.duplicate")
     second = _beverage(catalog_key="whiskey.duplicate")
@@ -110,7 +150,50 @@ def _beverage(
     catalog_key: str = "whiskey.test_bourbon",
     metadata: dict[str, object] | None = None,
 ) -> BeverageItem:
-    resolved_metadata = metadata or {
+    resolved_metadata = metadata or _base_metadata(catalog_key=catalog_key)
+    return BeverageItem(
+        id=uuid.uuid4(),
+        category="whiskey",
+        name_ko="테스트 버번",
+        name_en="Test Bourbon",
+        active=True,
+        metadata_json=resolved_metadata,
+    )
+
+
+def _base_metadata(
+    *,
+    catalog_key: str = "whiskey.test_bourbon",
+) -> dict[str, object]:
+    image = {
+        "policy_version": "beverage_image_v1",
+        "image_candidate_id": "bev_image_whiskey_category_representative_001",
+        "image_kind": "category_representative",
+        "image_url": (
+            "https://commons.wikimedia.org/wiki/Special:FilePath/"
+            "Glass_of_whisky.jpg"
+        ),
+        "original_image_url": (
+            "https://commons.wikimedia.org/wiki/Special:FilePath/"
+            "Glass_of_whisky.jpg"
+        ),
+        "cache_key": (
+            "beverage-images/v1/"
+            "bev_image_whiskey_category_representative_001.jpg"
+        ),
+        "cache_policy": "operator_managed_image_cache_v1",
+        "display_url_source": "licensed_source_url",
+        "alt_text_ko": "위스키 잔 대표 이미지",
+        "source_url": "https://commons.wikimedia.org/wiki/File:Glass_of_whisky.jpg",
+        "source_type": "wikimedia_commons",
+        "license": "Public Domain",
+        "license_url": "https://commons.wikimedia.org/wiki/File:Glass_of_whisky.jpg",
+        "attribution": "Chris huh / Wikimedia Commons",
+        "attribution_required": False,
+        "display_policy": "allowed_mvp_display_with_license_metadata",
+        "review_status": "source_checked_mvp_seed",
+    }
+    return {
         "catalog_key": catalog_key,
         "style": "bourbon",
         "source_type": "operator_reviewed_candidate_seed",
@@ -120,15 +203,17 @@ def _beverage(
         "aliases_en": ["Test Bourbon"],
         "aliases_ko": ["테스트 버번"],
         "serving_context": ["neat"],
+        "image": image,
+        "image_url": image["image_url"],
+        "image_alt_text_ko": image["alt_text_ko"],
+        "image_source_url": image["source_url"],
+        "image_license": image["license"],
+        "image_attribution": image["attribution"],
+        "image_display_policy": image["display_policy"],
+        "image_kind": image["image_kind"],
+        "image_review_status": image["review_status"],
+        "image_policy_version": image["policy_version"],
     }
-    return BeverageItem(
-        id=uuid.uuid4(),
-        category="whiskey",
-        name_ko="테스트 버번",
-        name_en="Test Bourbon",
-        active=True,
-        metadata_json=resolved_metadata,
-    )
 
 
 def _flavor_profile(beverage_id: uuid.UUID) -> FlavorProfile:

@@ -68,6 +68,12 @@ class Settings(BaseSettings):
     map_snapshot_events_path: str = "/internal/v1/recommendation/map-snapshot-events"
     map_snapshot_events_page_size: int = 100
     map_snapshot_request_timeout_seconds: float = 10.0
+    map_route_distance_enabled: bool = False
+    map_route_distance_path: str = "/internal/v1/recommendation/route-distance"
+    map_route_distance_timeout_seconds: float = 3.0
+    map_route_distance_fallback_enabled: bool = True
+    map_service_serverless_audience: str | None = None
+    map_service_serverless_token_timeout_seconds: float = 1.0
 
     sync_worker_enabled: bool = True
     sync_max_attempts: int = 5
@@ -79,7 +85,8 @@ class Settings(BaseSettings):
     default_venue_radius_meters: int = 3000
     active_vector_schema: str = "taste_v1"
     active_survey_mapper: str = "survey_mapper_v1_1"
-    active_scoring_config: str = "scoring_v1"
+    active_scoring_config: str = "scoring_v3"
+    beverage_image_cdn_base_url: str | None = None
 
     request_id_header: str = "X-Request-ID"
     structured_logs: bool = True

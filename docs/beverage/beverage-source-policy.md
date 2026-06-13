@@ -88,6 +88,50 @@ Rules:
 - Do not compare budgets strictly from these records.
 - Do not store venue/menu/live store prices as beverage catalog truth.
 
+## Image Candidate Rules
+
+Beverage display images are catalog display metadata, not recommendation scoring
+evidence.
+
+Rules:
+
+- Store only `image_url`, source URL, license, attribution, display policy, and
+  review status.
+- Do not copy binary image files into this repository.
+- Do not use random search-result thumbnails or unlicensed retailer images.
+- Do not rely on third-party hotlinking as the production app-display strategy.
+  Use the ONTHEBLOCK-managed image cache/CDN when available.
+- Prefer public-domain, CC0, or clearly licensed Wikimedia Commons assets for
+  MVP representative images.
+- A direct product or cocktail representative image may replace the category
+  fallback only when the source page provides explicit reusable license,
+  attribution, source URL, and review metadata.
+- Official marketing packshots, retailer thumbnails, bottle labels, or images
+  without clear reusable license still require operator/legal review before
+  replacing category representative images.
+- Images MUST NOT influence recommendation rank, score, flavor vector, price
+  logic, availability, or venue inventory truth.
+- If an image license requires attribution, Flutter must preserve a detail or
+  credits surface that can show attribution and license metadata.
+- Release gate MUST keep active beverage image URL coverage and image license
+  metadata coverage at `1.0`. It MUST also keep image cache metadata coverage at
+  `1.0`, even when local development still displays the licensed source URL. An
+  active beverage without display image metadata is a catalog audit failure, not
+  a Flutter fallback responsibility.
+- The seed importer MUST reject image candidates that use unapproved source
+  types, non-HTTPS URLs, unsupported image kinds, missing attribution metadata,
+  unknown `beverage_candidate_id` values, direct image category mismatches, or
+  duplicate category/direct image mappings.
+- Before releases that expose beverage images in Flutter, operators SHOULD run
+  the optional beverage image URL smoke to verify third-party image hosts still
+  return an `image/*` response. This check is intentionally not part of the
+  deterministic default release gate because external hosts can be temporarily
+  unavailable.
+- Before using a managed image CDN URL, operators SHOULD generate the beverage
+  image cache export manifest. The manifest preserves original image URL,
+  source URL, license, attribution, cache key, and connected beverage catalog
+  keys so the CDN object tree remains traceable to reviewed source metadata.
+
 ## Kakao Rule
 
 Do not use Kakao Local/Map API data for beverage catalog collection.

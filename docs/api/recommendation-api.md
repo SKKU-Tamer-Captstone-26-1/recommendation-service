@@ -84,6 +84,18 @@ HTTP JWKS endpoint.
 
 Public RPC requests MUST NOT contain `user_id` or `external_user_id` fields.
 
+Production mobile traffic is expected to arrive through `app-gateway-service`.
+When `recommendation-service` is private on Cloud Run, the gateway must preserve
+the user token and add Cloud Run IAM metadata separately:
+
+```text
+authorization: Bearer <auth-service-jwt>
+x-serverless-authorization: Bearer <google-id-token-for-recommendation-service>
+```
+
+`authorization` is consumed by recommendation-service for user context.
+`x-serverless-authorization` is consumed by Cloud Run for service-to-service IAM.
+
 ## gRPC Services
 
 The initial `recommendation.proto` is defined for the beverage-first production
@@ -189,6 +201,68 @@ Request fields:
 | `category` | no | Filter by beverage category |
 | `limit` | no | Result count |
 | `budget_mode` | no | `BUDGET_MODE_SOFT` or `BUDGET_MODE_STRICT` |
+| `exclude_beverage_ids` | no | Beverage UUIDs that must not be returned, usually previous chatbot results |
+| `exclude_result_ids` | no | Recommendation result UUIDs whose beverage targets must not be returned |
+| `diversity_mode` | no | Follow-up diversity intent: `STANDARD`, `DIFFERENT`, or `ADJACENT` |
+| `flavor_direction` | no | Taste-direction follow-up intent such as `SWEETER`, `SMOKIER`, or `LIGHTER` |
+
+Supported beverage diversity modes:
+
+| Mode | Meaning |
+|---|---|
+| `BEVERAGE_DIVERSITY_MODE_STANDARD` | Default ranked beverage recommendation behavior |
+| `BEVERAGE_DIVERSITY_MODE_DIFFERENT` | Avoid excluded beverages and, when possible, avoid their dominant style/category |
+| `BEVERAGE_DIVERSITY_MODE_ADJACENT` | Avoid excluded beverages while preferring a non-identical style close to the user's preferred category |
+
+Chatbot follow-up usage:
+
+```text
+User: 다른 술 추천해줘
+chatbot-service:
+  - reads previous recommendation result IDs from its conversation state
+  - calls GetBeverageRecommendations with exclude_result_ids
+  - sets diversity_mode = BEVERAGE_DIVERSITY_MODE_DIFFERENT
+recommendation-service:
+  - resolves result IDs to beverage IDs
+  - excludes those beverage IDs
+  - returns a deterministic ranked list
+```
+
+The gateway and chatbot-service must not rerank, invent candidates, or apply
+business recommendation logic outside this RPC. If exclusions remove all
+eligible candidates, the service may return fewer results instead of fabricating
+a fallback.
+
+Supported beverage flavor directions:
+
+| Direction | Meaning |
+|---|---|
+| `BEVERAGE_FLAVOR_DIRECTION_SWEETER` | Prefer sweeter, dessert-like, or rounded candidates |
+| `BEVERAGE_FLAVOR_DIRECTION_LESS_SWEET` | Prefer less sweet candidates with drier/brighter signals |
+| `BEVERAGE_FLAVOR_DIRECTION_SMOKIER` | Prefer smoky, peated, roasted, or stronger smoke-adjacent candidates |
+| `BEVERAGE_FLAVOR_DIRECTION_LESS_SMOKY` | Prefer less smoky candidates while allowing brighter/floral/fruity signals |
+| `BEVERAGE_FLAVOR_DIRECTION_LIGHTER` | Prefer lighter body and lower intensity with acidity/carbonation where available |
+| `BEVERAGE_FLAVOR_DIRECTION_RICHER` | Prefer fuller body, oak, dried fruit, and richer texture |
+| `BEVERAGE_FLAVOR_DIRECTION_MORE_HERBAL_BITTER` | Prefer herbal, botanical, and bitter profiles |
+| `BEVERAGE_FLAVOR_DIRECTION_BRIGHTER_FRUITY` | Prefer fruitier, brighter, and more acidic profiles |
+
+Chatbot flavor follow-up usage:
+
+```text
+User: 피트향은 줄이고 더 가벼운 걸로 추천해줘
+chatbot-service:
+  - keeps previous result IDs in exclude_result_ids when appropriate
+  - sets flavor_direction = BEVERAGE_FLAVOR_DIRECTION_LIGHTER
+  - may also use diversity_mode = BEVERAGE_DIVERSITY_MODE_ADJACENT
+recommendation-service:
+  - applies deterministic request-level score adjustment
+  - stores flavor_direction in request logs and result metadata
+  - returns server-owned ranking and reason codes
+```
+
+`flavor_direction` does not mutate the stored taste profile. It is a request
+control, and the service records its `beverage_flavor_direction_v1` policy in
+the response metadata under `source.model_features.flavor_direction_feature`.
 
 Response:
 
@@ -207,16 +281,77 @@ Response:
       "category": "whiskey",
       "score": 0.91,
       "reason_codes": ["MATCHES_VANILLA_CARAMEL", "BEGINNER_FRIENDLY"],
-      "explanation": "Matches your vanilla/caramel preference and beginner-friendly profile.",
+      "explanation": "Example Bourbon은(는) bourbon 계열로, 현재 취향 프로필과 잘 맞는 추천입니다. 달콤한 바닐라와 캐러멜 느낌을 선호하는 취향에 맞습니다. 처음 마시는 사람도 비교적 부담 없이 접근하기 좋습니다.",
       "metadata": {
         "style": "bourbon",
+        "image_url": "https://commons.wikimedia.org/wiki/Special:FilePath/Glass_of_whisky.jpg",
+        "image_alt_text_ko": "위스키 잔 대표 이미지",
+        "image": {
+          "policy_version": "beverage_image_v1",
+          "image_kind": "category_representative",
+          "image_url": "https://commons.wikimedia.org/wiki/Special:FilePath/Glass_of_whisky.jpg",
+          "original_image_url": "https://commons.wikimedia.org/wiki/Special:FilePath/Glass_of_whisky.jpg",
+          "cache_key": "beverage-images/v1/bev_image_whiskey_category_representative_001.jpg",
+          "cache_policy": "operator_managed_image_cache_v1",
+          "display_url_source": "licensed_source_url",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Glass_of_whisky.jpg",
+          "license": "Public Domain",
+          "attribution": "Chris huh / Wikimedia Commons",
+          "attribution_required": false,
+          "display_policy": "allowed_mvp_display_with_license_metadata"
+        },
         "similarity_score": 0.87,
-        "score_breakdown": {}
+        "score_breakdown": {},
+        "source": {
+          "image_url": "https://commons.wikimedia.org/wiki/Special:FilePath/Glass_of_whisky.jpg",
+          "image": {
+            "policy_version": "beverage_image_v1",
+            "image_kind": "category_representative"
+          },
+          "model_features": {
+            "budget_fit": 0.82,
+            "budget_feature": {
+              "strategy": "catalog_price_range_soft_v1",
+              "evidence": "catalog_price_range",
+              "confidence": 0.65,
+              "budget_range": "30000_100000",
+              "price_min_krw": 39000,
+              "price_max_krw": 45000,
+              "price_policy": "verified_krw_observations_not_live_truth"
+            },
+            "budget_tradeoff": {
+              "policy_version": "beverage_budget_tradeoff_v1",
+              "status": "within_budget",
+              "display_label_ko": "예산 적합",
+              "note_ko": "검증된 카탈로그 가격대가 선택한 예산 구간과 겹칩니다.",
+              "source": "catalog_price_not_live_offer"
+            }
+          }
+        }
       }
     }
   ]
 }
 ```
+
+`budget_feature` is a soft catalog signal. It is not a live store price, menu
+price, inventory fact, or strict affordability guarantee.
+`budget_tradeoff` is display-ready explanation metadata derived from the same
+soft catalog signal. Flutter and chatbot-service may show `display_label_ko`
+and `note_ko`, but must not treat it as live price or stock truth.
+
+`image_url` is the app display URL for recommendation cards. MVP image metadata
+may be a source-checked direct product/cocktail representative image or a
+category fallback. In local seed data the display URL may be the licensed source
+URL. In staging/production seed promotion, operators can set
+`BEVERAGE_IMAGE_CDN_BASE_URL` so `image_url` points to the ONTHEBLOCK-managed
+image cache while `metadata.image.original_image_url`, `source_url`, license,
+and attribution fields preserve traceability.
+
+Flutter may display `metadata.image_url` directly, but it must preserve
+`metadata.image` license/attribution fields for a detail or credits surface when
+attribution is required. Image presence, cache status, or image kind must not
+affect ranking, filtering, inventory display, or recommendation confidence.
 
 ### `RecommendationService.GetVenueRecommendations`
 
@@ -228,12 +363,39 @@ Request fields:
 
 | Name | Required | Meaning |
 |---|---|---|
-| `lat` | yes | Latitude |
-| `lng` | yes | Longitude |
+| `lat` | yes | User-origin WGS84 latitude forwarded by Flutter/gateway |
+| `lng` | yes | User-origin WGS84 longitude forwarded by Flutter/gateway |
 | `radius_m` | no | Search radius in meters |
 | `limit` | no | Result count |
 | `selected_beverage_id` | yes | Active canonical beverage the user wants to buy or drink |
 | `budget_mode` | no | `BUDGET_MODE_SOFT` or `BUDGET_MODE_STRICT` |
+| `place_types` | no | Optional place-type filter such as `bar`, `store`, `liquor_shop`, `bottle_shop`, or `outdoor` |
+
+`lat` and `lng` must be precise coordinates from the mobile location flow,
+map picker, or an approved auth/gateway user-location metadata contract. The
+current auth proto exposes `neighborhood` for profile display, but
+`recommendation-service` must not infer coordinates from that text field or read
+auth-service storage. If the gateway cannot provide precise coordinates, it
+should return a location-needed state instead of sending placeholder values.
+
+Kakao map keys and raw Kakao lookup payloads are not part of this RPC.
+Flutter/map-service may use Kakao for lookup/display under the Kakao policy, but
+venue ranking uses structured request coordinates plus map/place read-model
+snapshots and the approved map-service route-distance API.
+
+`place_types` is a request-level constraint over map/place read-model snapshot
+metadata. It does not create or edit canonical place taxonomy. Friendly aliases
+are resolved by recommendation-service before ranking:
+
+| Request value | Matched snapshot `place_type` values |
+|---|---|
+| `store` / `shop` | `bottle_shop`, `liquor_shop`, `store` |
+| `bar` | `bar`, `cocktail_bar`, `pub`, `whiskey_bar`, `wine_bar` |
+| `pub` | `pub`, `bar` |
+| `outdoor` | `outdoor_spot`, `outdoor` |
+
+Unknown values are rejected as invalid requests so Flutter, gateway, and
+chatbot contracts do not silently drift.
 
 Response:
 
@@ -264,7 +426,16 @@ Response:
           "menu_revision": "menu_rev_7",
           "inventory_revision": "inv_rev_8",
           "price_revision": "price_rev_3",
-          "distance_strategy": "straight_line_mvp"
+          "distance_m": 720,
+          "distance_strategy": "straight_line_mvp",
+          "distance_source": "venue_snapshot_coordinates",
+          "distance_confidence": 0.45,
+          "is_route_distance": false,
+          "distance_fallback_used": false,
+          "straight_line_distance_m": 720,
+          "route_distance_m": null,
+          "route_duration_seconds": null,
+          "route_complexity": null
         }
       }
     }
@@ -274,6 +445,32 @@ Response:
 
 Venue results MUST be generated from map/place read-model snapshots documented
 in `../recommendation/map-read-model.md`.
+
+`distance_m` is interpreted by `metadata.source.distance_strategy`.
+`straight_line_mvp` is not a real route estimate. Flutter, gateway, and
+chatbot-service must not relabel it as walking, driving, or transit distance.
+When a future map-service route provider is approved, the same metadata surface
+can report `is_route_distance=true`, `route_distance_m`,
+`route_duration_seconds`, and `route_complexity`.
+
+Runtime route distance is controlled by:
+
+```text
+MAP_ROUTE_DISTANCE_ENABLED
+MAP_ROUTE_DISTANCE_PATH
+MAP_ROUTE_DISTANCE_TIMEOUT_SECONDS
+MAP_ROUTE_DISTANCE_FALLBACK_ENABLED
+MAP_SERVICE_SERVERLESS_AUDIENCE
+```
+
+When enabled, recommendation-service calls the approved map-service route API
+and converts the response into the existing `VenueDistanceFeature` metadata. A
+missing route response, timeout, malformed payload, or failed private Cloud Run
+ID token lookup falls back to `straight_line_mvp` when fallback is enabled.
+Clients must inspect each result's `metadata.source.is_route_distance` before
+displaying route-style copy. `metadata.source.distance_fallback_used=true`
+means a route lookup was attempted but the service returned a straight-line
+fallback result instead.
 
 Supported venue option types:
 

@@ -182,6 +182,7 @@
     "jsonl_files": [
       "data/beverage/catalog_candidates.jsonl",
       "data/beverage/flavor_profile_candidates.jsonl",
+      "data/beverage/image_candidates.jsonl",
       "data/beverage/knowledge_candidates.jsonl",
       "data/beverage/price_observation_candidates.jsonl"
     ],

@@ -9,17 +9,45 @@ python3 -m ruff check .
 python3 -m compileall -q app tests
 git diff --check
 
+python3 -m app.tools.survey_mapper_audit \
+  --report "$REPORT_DIR/survey_mapper_audit.json"
+
 python3 -m app.tools.beverage_catalog_audit \
   --report "$REPORT_DIR/beverage_catalog_audit.json"
 
 python3 -m app.tools.evaluate_drink_recommendations \
   --report "$REPORT_DIR/drink_recommendation_evaluation.json" \
-  --min-fixture-count 20 \
-  --min-hit-rate 0.85 \
+  --scoring-config-version scoring_v3 \
+  --min-fixture-count 29 \
+  --min-hit-rate 0.95 \
+  --min-top-result-positive-hit-rate 1.0 \
   --max-negative-violations 0 \
   --min-category-style-match-rate 0.65 \
   --min-reason-code-coverage 0.95 \
-  --min-positive-above-negative-rate 0.9
+  --min-top-result-reason-hit-rate 1.0 \
+  --min-average-top-result-reason-coverage 0.5 \
+  --min-different-followup-change-rate 1.0 \
+  --min-different-followup-style-or-category-change-rate 0.95 \
+  --min-adjacent-followup-change-rate 1.0 \
+  --min-budget-affordable-candidate-count 20 \
+  --min-budget-premium-candidate-count 2 \
+  --min-budget-affordable-score-preference-rate 1.0 \
+  --min-budget-premium-score-preference-rate 1.0 \
+  --min-positive-above-negative-rate 1.0 \
+  --min-positive-negative-margin 0.15 \
+  --min-directional-followup-count 6 \
+  --min-directional-followup-score-preference-rate 1.0 \
+  --min-directional-followup-direction-count 6 \
+  --min-directional-followup-margin 0.05 \
+  --min-active-category-coverage 1.0 \
+  --min-fixtures-per-active-category 2 \
+  --min-experience-level-coverage 1.0 \
+  --min-fixtures-per-experience-level 3 \
+  --min-deployed-budget-coverage 1.0 \
+  --min-fixtures-per-deployed-budget 1 \
+  --min-deployed-survey-category-coverage 1.0 \
+  --min-deployed-survey-category-trait-coverage 1.0 \
+  --min-deployed-survey-flavor-keyword-coverage 1.0
 
 rg -n \
   "survey.*database|map.*database|survey_db|map_db|SELECT .*survey|SELECT .*map|direct.*survey|direct.*map" \

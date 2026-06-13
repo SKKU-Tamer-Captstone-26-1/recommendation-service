@@ -87,6 +87,7 @@ IMAGE="${RECOMMENDATION_IMAGE:-}"
 DATABASE_SECRET="${RECOMMENDATION_DATABASE_SECRET:-recommendation-db-dsn-staging}"
 QDRANT_URL_SECRET="${RECOMMENDATION_QDRANT_URL_SECRET:-recommendation-qdrant-url-staging}"
 QDRANT_API_KEY_SECRET="${RECOMMENDATION_QDRANT_API_KEY_SECRET:-recommendation-qdrant-api-key-staging}"
+BEVERAGE_IMAGE_CDN_BASE_URL_SECRET="${RECOMMENDATION_BEVERAGE_IMAGE_CDN_BASE_URL_SECRET:-}"
 CLOUD_SQL_INSTANCE="${RECOMMENDATION_CLOUD_SQL_INSTANCE:-${PROJECT}:asia-northeast3:recommendation-postgres-staging}"
 SERVICE_ACCOUNT="${RECOMMENDATION_RUNTIME_SERVICE_ACCOUNT:-recommendation-service-staging@${PROJECT}.iam.gserviceaccount.com}"
 TASK_TIMEOUT="${RECOMMENDATION_JOB_TASK_TIMEOUT:-1800s}"
@@ -139,6 +140,15 @@ if [[ -n "$SURVEY_SERVICE_GRPC_AUTH_BEARER_TOKEN_SECRET" ]]; then
   require_secret "$PROJECT" "$SURVEY_SERVICE_GRPC_AUTH_BEARER_TOKEN_SECRET"
   secret_envs+=(
     "SURVEY_SERVICE_GRPC_AUTH_BEARER_TOKEN=${SURVEY_SERVICE_GRPC_AUTH_BEARER_TOKEN_SECRET}:latest"
+  )
+fi
+if [[ "$MODE" == "seed" && -n "$BEVERAGE_IMAGE_CDN_BASE_URL_SECRET" ]]; then
+  [[ "$BEVERAGE_IMAGE_CDN_BASE_URL_SECRET" == *recommendation* \
+    || "$BEVERAGE_IMAGE_CDN_BASE_URL_SECRET" == *rec* ]] \
+    || fail "beverage image CDN base URL secret must clearly belong to recommendation-service"
+  require_secret "$PROJECT" "$BEVERAGE_IMAGE_CDN_BASE_URL_SECRET"
+  secret_envs+=(
+    "BEVERAGE_IMAGE_CDN_BASE_URL=${BEVERAGE_IMAGE_CDN_BASE_URL_SECRET}:latest"
   )
 fi
 

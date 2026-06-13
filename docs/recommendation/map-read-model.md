@@ -249,6 +249,13 @@ Venue recommendation results SHOULD expose:
 - snapshot synced time
 - freshness status
 
+Venue recommendation requests MAY filter by map/place snapshot `place_type`.
+This is a request-level read-model constraint only. recommendation-service does
+not create canonical place taxonomy and does not write place/menu/inventory/price
+state. Alias values such as `store`, `bar`, and `outdoor` are resolved to known
+snapshot place-type values before ranking, while the response preserves the
+original snapshot `place_type`.
+
 ## Recommendation Logs
 
 Recommendation logs MUST include snapshot revision data.
@@ -305,9 +312,248 @@ Scoring inputs may include:
 Do not return several near-identical top-scoring venues when the product request
 expects meaningful alternatives.
 
-MVP selected-beverage venue recommendations use straight-line distance labeled
-as `distance_strategy = straight_line_mvp`. Route optimization and transit
-estimates require a later approved slice.
+Selected-beverage venue recommendations use an injected distance provider.
+The default provider returns straight-line distance labeled as
+`distance_strategy = straight_line_mvp`. When the approved map-service route
+adapter is enabled, route-aware results are labeled as
+`distance_strategy = map_route_estimate_v1` and straight-line fallback is marked
+explicitly.
+
+## Distance Feature Contract
+
+Venue scoring must receive distance as an explicit feature, not as an implicit
+hardcoded calculation hidden inside ranking.
+
+Current default:
+
+```text
+strategy = straight_line_mvp
+source = venue_snapshot_coordinates
+is_route_distance = false
+confidence = 0.45
+```
+
+This means `distance_m` is a WGS84 haversine straight-line distance between the
+authenticated request lat/lng and the venue snapshot coordinates. It is useful
+for MVP ranking and radius filtering, but it is not walking distance, driving
+distance, route time, public-transit time, or accessibility.
+
+Venue recommendation metadata MUST preserve:
+
+```text
+distance_m
+distance_strategy
+distance_source
+distance_confidence
+is_route_distance
+distance_fallback_used
+straight_line_distance_m
+route_distance_m
+route_duration_seconds
+route_complexity
+```
+
+Future map-service route integration should provide a route-aware distance
+feature through an adapter/provider boundary:
+
+```text
+strategy = map_route_estimate_v1
+source = map_service_route_api
+is_route_distance = true
+route_distance_m = <meters from route provider>
+route_duration_seconds = <estimated travel time if available>
+route_complexity = <simple | moderate | complex if available>
+```
+
+The route adapter/provider must be injected into `BeverageRecommendationService`
+through the service boundary. Request logs must preserve the selected provider
+policy and the strategies used by returned results:
+
+```text
+distance_provider_policy = service_injected_provider_v1
+distance_strategy = straight_line_mvp | map_route_estimate_v1 | mixed_distance_strategy | no_distance_results
+distance_strategies = [...]
+distance_sources = [...]
+is_route_distance = true | false
+distance_fallback_used = true | false
+distance_result_count = <returned venue result count>
+route_distance_result_count = <results using map-service route estimates>
+straight_line_distance_result_count = <results using straight-line distance>
+fallback_distance_result_count = <results where route lookup failed and fallback was used>
+unknown_distance_result_count = <results with an unclassified distance strategy>
+distance_route_coverage = <route_distance_result_count / distance_result_count>
+distance_strategy_counts = {"map_route_estimate_v1": 1, "straight_line_mvp": 1}
+distance_source_counts = {"map_service_route_api": 1, "venue_snapshot_coordinates": 1}
+```
+
+`MapRouteDistanceProvider` is the recommendation-service adapter base for a
+future map-service route client. It does not own route facts and it does not
+read map-service storage. A future gRPC or HTTP client should implement this
+protocol-like contract:
+
+```text
+route_distance(
+  place_id,
+  origin_lat,
+  origin_lng,
+  destination_lat,
+  destination_lng,
+  requested_at
+) -> MapRouteDistanceEstimate | None
+```
+
+`MapRouteDistanceEstimate` is converted into `VenueDistanceFeature` with:
+
+```text
+strategy = map_route_estimate_v1
+source = map_service_route_api
+is_route_distance = true
+distance_m = route_distance_m
+straight_line_distance_m = haversine(origin, venue snapshot coordinates)
+```
+
+`None` means map-service could not produce a route estimate for that candidate.
+When wrapped with `FallbackVenueDistanceProvider`, the service then falls back to
+`straight_line_mvp`.
+
+Runtime provider wiring uses `create_venue_distance_provider(settings, route_client=...)`:
+
+```text
+MAP_ROUTE_DISTANCE_ENABLED=false
+  -> StraightLineVenueDistanceProvider
+
+MAP_ROUTE_DISTANCE_ENABLED=true with route_client
+  -> FallbackVenueDistanceProvider(
+       primary=MapRouteDistanceProvider(route_client),
+       fallback=StraightLineVenueDistanceProvider()
+     )
+
+MAP_ROUTE_DISTANCE_ENABLED=true without route_client
+  -> StraightLineVenueDistanceProvider and warning log
+```
+
+Runtime gRPC construction now creates an HTTP route client when
+`MAP_ROUTE_DISTANCE_ENABLED=true`. The client calls map-service through the
+approved service API boundary; it does not read map-service storage.
+
+HTTP route request:
+
+```http
+POST /internal/v1/recommendation/route-distance
+```
+
+```json
+{
+  "contract_version": "map_route_distance_request_v1",
+  "place_id": "place_123",
+  "origin": {"lat": 37.5, "lng": 127.0},
+  "destination": {"lat": 37.501, "lng": 127.001},
+  "requested_at": "2026-06-08T12:00:00+00:00"
+}
+```
+
+HTTP route response:
+
+```json
+{
+  "route_distance_m": 780.4,
+  "route_duration_seconds": 520,
+  "route_complexity": "simple",
+  "confidence": 0.88
+}
+```
+
+`204`, `404`, request timeout, malformed payload, or failed private Cloud Run ID
+token lookup means no usable route estimate for that candidate. With fallback
+enabled, the service then uses `straight_line_mvp` for that candidate and
+preserves fallback metadata in the result and request log.
+
+If map-service is private on Cloud Run, set:
+
+```text
+MAP_SERVICE_SERVERLESS_AUDIENCE=https://<map-service-cloud-run-url>
+```
+
+The route client fetches a Google ID token from the Cloud Run metadata server
+and sends it as:
+
+```text
+x-serverless-authorization: Bearer <google-id-token>
+```
+
+The gRPC server path passes the configured provider into
+`BeverageRecommendationService`, so the ranking path does not need to change
+when the real map-service client is added.
+
+When the future map-service route adapter cannot produce a route estimate for a
+candidate, it should return no distance feature for that candidate and be wrapped
+with `FallbackVenueDistanceProvider`. The fallback provider uses the current
+`StraightLineVenueDistanceProvider` so a partial map-service route failure does
+not erase otherwise valid recommendation candidates.
+
+Injected distance provider output is validated before scoring. Invalid primary
+provider output is treated as missing so `FallbackVenueDistanceProvider` can use
+straight-line fallback. Invalid final provider output excludes the candidate from
+venue ranking.
+
+Provider output validation:
+
+```text
+distance_m must be finite and >= 0
+strategy/source must be non-empty strings
+confidence must be finite and between 0 and 1
+is_route_distance must be boolean
+distance_fallback_used must be boolean
+
+if is_route_distance=true:
+  route_distance_m must be finite and >= 0
+  distance_m must match route_distance_m
+  route_duration_seconds, if present, must be >= 0
+  straight_line_distance_m, if present, must be finite and >= 0
+
+if is_route_distance=false:
+  straight_line_distance_m must be finite and >= 0
+  distance_m must match straight_line_distance_m
+  route_distance_m must be null
+  route_duration_seconds must be null
+```
+
+If some returned results use route distance and others fall back to straight-line
+distance, request logs MUST report:
+
+```text
+distance_strategy = mixed_distance_strategy
+distance_strategies = ["map_route_estimate_v1", "straight_line_mvp"]
+distance_sources = ["map_service_route_api", "venue_snapshot_coordinates"]
+is_route_distance = true
+distance_fallback_used = <per-result metadata only>
+distance_result_count = 2
+route_distance_result_count = 1
+straight_line_distance_result_count = 1
+fallback_distance_result_count = 1
+unknown_distance_result_count = 0
+distance_route_coverage = 0.5
+distance_strategy_counts = {"map_route_estimate_v1": 1, "straight_line_mvp": 1}
+distance_source_counts = {"map_service_route_api": 1, "venue_snapshot_coordinates": 1}
+```
+
+If no venue candidates are returned, request logs MUST use:
+
+```text
+distance_strategy = no_distance_results
+distance_result_count = 0
+route_distance_result_count = 0
+straight_line_distance_result_count = 0
+distance_route_coverage = 0.0
+```
+
+Flutter, gateway, and chatbot-service must inspect per-result metadata before
+describing distance. They must not describe a fallback straight-line result as a
+route distance.
+
+`recommendation-service` still owns ranking and score breakdowns. map-service
+owns canonical route/place facts. Flutter, gateway, and chatbot-service must not
+rewrite straight-line distance into route distance.
 
 ## Rebuild Strategy
 

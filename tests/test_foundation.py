@@ -1,11 +1,15 @@
 from fastapi.testclient import TestClient
 
-from app.core.config import Settings
+from app.core.config import Settings, get_settings
 from app.db.base import Base
 from app.domain.foundation_versions import (
     SCORING_V1,
+    SCORING_V2,
+    SCORING_V3,
     SURVEY_MAPPER_V1_1,
     scoring_v1_payloads,
+    scoring_v2_payloads,
+    scoring_v3_payloads,
     survey_mapper_v1_1_payload,
     taste_v1_vector_schema_payload,
 )
@@ -26,16 +30,22 @@ def test_live_health_endpoint_is_dependency_free() -> None:
 
 
 def test_service_status_exposes_active_foundation_versions() -> None:
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        active_scoring_config="scoring_v3",
+    )
     client = TestClient(app)
 
-    response = client.get("/v1/status")
+    try:
+        response = client.get("/v1/status")
+    finally:
+        app.dependency_overrides.clear()
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["service"] == "recommendation-service"
     assert payload["active_vector_schema"] == "taste_v1"
     assert payload["active_survey_mapper"] == "survey_mapper_v1_1"
-    assert payload["active_scoring_config"] == "scoring_v1"
+    assert payload["active_scoring_config"] == "scoring_v3"
 
 
 def test_model_metadata_registers_foundation_tables() -> None:
@@ -92,6 +102,26 @@ def test_foundation_version_payloads_match_active_settings() -> None:
     }
     assert all(payload["version"] == SCORING_V1 for payload in scoring_payloads)
     assert all(payload["status"] == "active" for payload in scoring_payloads)
+
+    scoring_v2 = scoring_v2_payloads()
+    assert {payload["target_type"] for payload in scoring_v2} == {
+        "beverage",
+        "venue",
+    }
+    assert all(payload["version"] == SCORING_V2 for payload in scoring_v2)
+    assert scoring_v2[0]["reason_code_rules_json"][
+        "budget_feature_strategy"
+    ] == "catalog_price_range_soft_v1"
+
+    scoring_v3 = scoring_v3_payloads()
+    assert {payload["target_type"] for payload in scoring_v3} == {
+        "beverage",
+        "venue",
+    }
+    assert all(payload["version"] == SCORING_V3 for payload in scoring_v3)
+    assert scoring_v3[0]["reason_code_rules_json"][
+        "similarity_strategy"
+    ] == "category_weighted_similarity_v1"
 
 
 def test_grpc_health_server_can_be_created() -> None:

@@ -156,6 +156,28 @@ Budget normalization:
 It is still retained as a category signal by mapping it to the internal beverage
 catalog category `brandy_cognac`.
 
+## Mapper Coverage Audit
+
+The local release gate runs:
+
+```bash
+python3 -m app.tools.survey_mapper_audit
+```
+
+This audit verifies that the current deployed
+`ontheblock.survey.v1.SurveyResult` tokens have deterministic mapper coverage:
+
+- all deployed categories map to internal recommendation categories
+- `cognac` maps to `brandy_cognac`
+- all whiskey/wine/cocktail/beer category tokens map to taste dimensions
+- all `flavor_keywords` map to taste dimensions
+- all deployed budget tokens map to canonical budget ranges
+
+The audit MUST keep `critical=0` before release. If survey-service adds or
+renames a category, style token, flavor keyword, or budget token, the mapper
+must be updated and versioned before recommendation-service deploys against the
+new contract.
+
 ## Output Contract
 
 Generated profile MUST include:

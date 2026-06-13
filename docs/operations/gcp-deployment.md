@@ -41,6 +41,8 @@ Secret Manager secret: recommendation-db-dsn-staging
 Qdrant endpoint: recommendation-owned staging Qdrant
 Secret Manager secret: recommendation-qdrant-url-staging
 Secret Manager secret: recommendation-qdrant-api-key-staging when required
+Cloud Storage bucket: recommendation-owned beverage image cache bucket
+Secret Manager secret: recommendation-beverage-image-cdn-base-url-staging
 ```
 
 The `DATABASE_URL` secret must point only at the recommendation-owned database.
@@ -179,6 +181,67 @@ secret_access = recommendation-qdrant-api-key-staging
 Do not grant this service account access to auth, survey, chat, map, gateway,
 or shared database secrets.
 
+## Provision Beverage Image Cache
+
+The beverage image cache is display infrastructure for recommendation-owned
+beverage catalog metadata. It is not recommendation scoring evidence and must
+not store survey, user, map, inventory, or price data.
+
+Dry-run inspection:
+
+```bash
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-provision-staging-image-cache.sh
+```
+
+Apply:
+
+```bash
+RECOMMENDATION_IMAGE_CACHE_PROVISION_APPLY=1 \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-provision-staging-image-cache.sh
+```
+
+The script creates or confirms:
+
+```text
+bucket = ontheblock-beverage-images-staging-<project>
+location = asia-northeast3
+cdn_base_url_secret = recommendation-beverage-image-cdn-base-url-staging
+secret_access = recommendation-service-staging runtime service account
+```
+
+By default, the script does not grant public read. Set
+`RECOMMENDATION_IMAGE_CACHE_PUBLIC_READ=1` only when the bucket URL is the
+reviewed public MVP image URL. If a separate CDN host is used, set:
+
+```text
+RECOMMENDATION_IMAGE_CDN_BASE_URL=https://<image-cdn-host>
+```
+
+Then export and upload reviewed image assets:
+
+```bash
+python3 -m app.tools.beverage_image_cache_export \
+  --download \
+  --output-dir /private/tmp/recommendation-beverage-image-cache \
+  --manifest /private/tmp/recommendation-beverage-image-cache/manifest.json \
+  --gcs-bucket ontheblock-beverage-images-staging-<project>
+
+gcloud storage cp -r \
+  /private/tmp/recommendation-beverage-image-cache/beverage-images \
+  gs://ontheblock-beverage-images-staging-<project>/
+```
+
+For the seed job to use the CDN base URL secret, pass:
+
+```bash
+RECOMMENDATION_JOB_MODE=seed \
+RECOMMENDATION_BEVERAGE_IMAGE_CDN_BASE_URL_SECRET=recommendation-beverage-image-cdn-base-url-staging \
+GCP_PROJECT=on-the-block-2026 \
+bash scripts/deploy/gcp-run-staging-job.sh
+```
+
 ## Deploy gRPC Service
 
 Preflight without deploying:
@@ -230,6 +293,8 @@ JWT_ISSUER=on-the-block-auth
 JWT_AUDIENCE=recommendation-service
 SURVEY_SERVICE_URL=https://survey-service-vcuepibcwq-du.a.run.app
 SURVEY_SERVICE_GRPC_ADDR=survey-service-vcuepibcwq-du.a.run.app:443
+MAP_ROUTE_DISTANCE_ENABLED=false
+MAP_ROUTE_DISTANCE_FALLBACK_ENABLED=true
 SYNC_WORKER_ENABLED=false
 ```
 
@@ -249,6 +314,33 @@ By default, the script deploys with:
 ```text
 --no-allow-unauthenticated
 ```
+
+Production mobile traffic must stay behind `app-gateway-service`:
+
+```text
+Flutter -> app-gateway-service -> private recommendation-service
+```
+
+Grant the app-gateway runtime service account Cloud Run Invoker on
+`recommendation-service`:
+
+```bash
+gcloud run services add-iam-policy-binding recommendation-service \
+  --region=asia-northeast3 \
+  --project=on-the-block-2026 \
+  --member="serviceAccount:<APP_GATEWAY_SERVICE_ACCOUNT>" \
+  --role=roles/run.invoker
+```
+
+When app-gateway calls the private recommendation gRPC service, it must send:
+
+```text
+authorization: Bearer <auth-service-jwt>
+x-serverless-authorization: Bearer <google-id-token-for-recommendation-service>
+```
+
+The first token is for application user context. The second token is for Cloud
+Run IAM admission. Do not replace the user token with the Google ID token.
 
 Set:
 
@@ -362,6 +454,7 @@ After Cloud Run reports a ready revision:
 ```bash
 RECOMMENDATION_SMOKE_GRPC_ADDR=recommendation-service-vcuepibcwq-du.a.run.app:443 \
 SMOKE_AUTH_BEARER_TOKEN=<safe-staging-token> \
+SMOKE_SERVERLESS_AUTH_TOKEN=<google-id-token-for-recommendation-service> \
 SMOKE_GRPC_TLS=1 \
 python3 -m app.tools.deployed_smoke --mode recommendation
 ```
@@ -371,6 +464,7 @@ For a stronger active-profile smoke:
 ```bash
 RECOMMENDATION_SMOKE_GRPC_ADDR=<recommendation-cloud-run-host>:443 \
 SMOKE_AUTH_BEARER_TOKEN=<safe-staging-token> \
+SMOKE_SERVERLESS_AUTH_TOKEN=<google-id-token-for-recommendation-service> \
 RECOMMENDATION_SMOKE_EXPECT_ACTIVE_PROFILE=true \
 RECOMMENDATION_SMOKE_RUN_BEVERAGE=true \
 RECOMMENDATION_SMOKE_RECORD_EVENT=true \
@@ -381,6 +475,42 @@ python3 -m app.tools.deployed_smoke --mode recommendation
 `RECOMMENDATION_SMOKE_RECORD_EVENT=true` records an impression for the first
 beverage result using allowlisted smoke metadata. This completes the staging
 Flutter call sequence through `RecordRecommendationEvent`.
+
+For selected-beverage venue smoke with a place-type filter:
+
+```bash
+RECOMMENDATION_SMOKE_GRPC_ADDR=<recommendation-cloud-run-host>:443 \
+SMOKE_AUTH_BEARER_TOKEN=<safe-staging-token> \
+SMOKE_SERVERLESS_AUTH_TOKEN=<google-id-token-for-recommendation-service> \
+RECOMMENDATION_SMOKE_SELECTED_BEVERAGE_ID=<safe-beverage-uuid> \
+RECOMMENDATION_SMOKE_LAT=37.5 \
+RECOMMENDATION_SMOKE_LNG=127.0 \
+RECOMMENDATION_SMOKE_VENUE_PLACE_TYPES=store \
+RECOMMENDATION_SMOKE_EXPECT_VENUE_RESULTS=true \
+RECOMMENDATION_SMOKE_VALIDATE_VENUE_CONTRACT=true \
+SMOKE_GRPC_TLS=1 \
+python3 -m app.tools.deployed_smoke --mode recommendation
+```
+
+This verifies that deployed `GetVenueRecommendations` accepts the same
+`place_types` contract used by Flutter, app-gateway-service, and chatbot-service
+for store/bar/outdoor venue intent. It still uses recommendation read-model
+snapshots only; canonical place data remains owned by map-service.
+
+For private Cloud Run smoke from a shell with `gcloud` credentials, generate
+the serverless token outside the tool and pass it through the environment:
+
+```bash
+SMOKE_SERVERLESS_AUTH_TOKEN="$(gcloud auth print-identity-token)" \
+RECOMMENDATION_SMOKE_GRPC_ADDR=recommendation-service-vcuepibcwq-du.a.run.app:443 \
+SMOKE_AUTH_BEARER_TOKEN=<safe-staging-token> \
+SMOKE_GRPC_TLS=1 \
+python3 -m app.tools.deployed_smoke --mode recommendation
+```
+
+If the shell account cannot mint the correct audience token, run the smoke from
+an environment that uses the app-gateway runtime service account or use
+`grpcurl` with the service account's Google ID token.
 
 ## Plan 012 Acceptance Runner
 

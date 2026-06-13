@@ -1,5 +1,9 @@
 import uuid
 from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock
+
+import pytest
+from sqlalchemy.orm import Session
 
 from app.models.catalog import (
     BeverageItem,
@@ -9,14 +13,52 @@ from app.models.catalog import (
     VenueSnapshot,
 )
 from app.models.profile import TasteProfileRevision
+from app.models.recommendation_event import (
+    RecommendationExplanation,
+    RecommendationRequest,
+)
 from app.models.versioning import ScoringConfig
 from app.repositories.catalog import VenueSnapshotCandidate
 from app.services.recommendations import (
+    BeverageRecommendationService,
+    FallbackVenueDistanceProvider,
+    MapRouteDistanceEstimate,
+    MapRouteDistanceProvider,
+    StraightLineVenueDistanceProvider,
+    VenueDistanceFeature,
+    create_venue_distance_provider,
     rank_venue_candidates,
     score_venue_candidate,
 )
 
 NOW = datetime(2026, 5, 23, 12, 0, tzinfo=UTC)
+
+
+def test_create_venue_distance_provider_defaults_to_straight_line() -> None:
+    provider = create_venue_distance_provider(
+        _Settings(map_route_distance_enabled=False),
+    )
+
+    assert isinstance(provider, StraightLineVenueDistanceProvider)
+
+
+def test_create_venue_distance_provider_wraps_map_route_client_with_fallback() -> None:
+    provider = create_venue_distance_provider(
+        _Settings(map_route_distance_enabled=True),
+        route_client=_MapRouteDistanceClient(
+            MapRouteDistanceEstimate(route_distance_m=780.4),
+        ),
+    )
+
+    assert isinstance(provider, FallbackVenueDistanceProvider)
+
+
+def test_create_venue_distance_provider_without_client_stays_straight_line() -> None:
+    provider = create_venue_distance_provider(
+        _Settings(map_route_distance_enabled=True),
+    )
+
+    assert isinstance(provider, StraightLineVenueDistanceProvider)
 
 
 def test_rank_venue_candidates_returns_distinct_tradeoff_options() -> None:
@@ -158,6 +200,666 @@ def test_venue_score_preserves_snapshot_revision_metadata() -> None:
     assert score.source_snapshot["inventory_revision"] == "inv_rev_place_meta"
     assert score.source_snapshot["price_revision"] == "price_rev_place_meta"
     assert score.source_snapshot["distance_strategy"] == "straight_line_mvp"
+    assert score.source_snapshot["distance_source"] == "venue_snapshot_coordinates"
+    assert score.source_snapshot["distance_confidence"] == 0.45
+    assert score.source_snapshot["is_route_distance"] is False
+    assert score.source_snapshot["distance_fallback_used"] is False
+    assert score.source_snapshot["straight_line_distance_m"] == score.distance_m
+    assert score.source_snapshot["route_distance_m"] is None
+    assert score.source_snapshot["route_duration_seconds"] is None
+    assert score.source_snapshot["route_complexity"] is None
+
+
+def test_venue_score_accepts_route_ready_distance_provider() -> None:
+    score = score_venue_candidate(
+        profile=_profile(),
+        selected_beverage=_beverage(),
+        candidate=_candidate(place_id="place_route", price_krw=42000),
+        scoring_config=_venue_scoring(),
+        lat=37.5,
+        lng=127.0,
+        radius_m=1500,
+        budget_mode="soft",
+        now=NOW,
+        distance_provider=_RouteDistanceProvider(),
+    )
+
+    assert score is not None
+    assert score.distance_m == 900.0
+    assert score.source_snapshot["distance_strategy"] == "map_route_estimate_v1"
+    assert score.source_snapshot["distance_source"] == "map_service_route_api"
+    assert score.source_snapshot["distance_confidence"] == 0.9
+    assert score.source_snapshot["is_route_distance"] is True
+    assert score.source_snapshot["distance_fallback_used"] is False
+    assert score.source_snapshot["straight_line_distance_m"] == 610.0
+    assert score.source_snapshot["route_distance_m"] == 900.0
+    assert score.source_snapshot["route_duration_seconds"] == 720
+    assert score.source_snapshot["route_complexity"] == "moderate"
+
+
+def test_map_route_distance_provider_converts_client_estimate() -> None:
+    client = _MapRouteDistanceClient(
+        MapRouteDistanceEstimate(
+            route_distance_m=780.4,
+            route_duration_seconds=520,
+            route_complexity="simple",
+            confidence=0.88,
+        ),
+    )
+    score = score_venue_candidate(
+        profile=_profile(),
+        selected_beverage=_beverage(),
+        candidate=_candidate(
+            place_id="place_map_route",
+            lat=37.501,
+            lng=127.0,
+            price_krw=42000,
+        ),
+        scoring_config=_venue_scoring(),
+        lat=37.5,
+        lng=127.0,
+        radius_m=1500,
+        budget_mode="soft",
+        now=NOW,
+        distance_provider=MapRouteDistanceProvider(client),
+    )
+
+    assert score is not None
+    assert score.distance_m == 780.4
+    assert score.source_snapshot["distance_strategy"] == "map_route_estimate_v1"
+    assert score.source_snapshot["distance_source"] == "map_service_route_api"
+    assert score.source_snapshot["distance_confidence"] == 0.88
+    assert score.source_snapshot["is_route_distance"] is True
+    assert score.source_snapshot["distance_fallback_used"] is False
+    assert score.source_snapshot["straight_line_distance_m"] is not None
+    assert score.source_snapshot["route_distance_m"] == 780.4
+    assert score.source_snapshot["route_duration_seconds"] == 520
+    assert score.source_snapshot["route_complexity"] == "simple"
+    assert client.calls == [
+        {
+            "place_id": "place_map_route",
+            "origin_lat": 37.5,
+            "origin_lng": 127.0,
+            "destination_lat": 37.501,
+            "destination_lng": 127.0,
+            "requested_at": NOW,
+        },
+    ]
+
+
+def test_fallback_distance_provider_uses_straight_line_when_route_missing() -> None:
+    score = score_venue_candidate(
+        profile=_profile(),
+        selected_beverage=_beverage(),
+        candidate=_candidate(
+            place_id="place_route_missing",
+            lat=37.501,
+            lng=127.0,
+            price_krw=42000,
+        ),
+        scoring_config=_venue_scoring(),
+        lat=37.5,
+        lng=127.0,
+        radius_m=1500,
+        budget_mode="soft",
+        now=NOW,
+        distance_provider=FallbackVenueDistanceProvider(
+            primary=_MissingRouteDistanceProvider(),
+        ),
+    )
+
+    assert score is not None
+    assert score.source_snapshot["distance_strategy"] == "straight_line_mvp"
+    assert score.source_snapshot["distance_source"] == "venue_snapshot_coordinates"
+    assert score.source_snapshot["is_route_distance"] is False
+    assert score.source_snapshot["distance_fallback_used"] is True
+    assert score.source_snapshot["route_distance_m"] is None
+    assert score.source_snapshot["straight_line_distance_m"] == score.distance_m
+
+
+def test_map_route_distance_provider_none_uses_straight_line_fallback() -> None:
+    score = score_venue_candidate(
+        profile=_profile(),
+        selected_beverage=_beverage(),
+        candidate=_candidate(
+            place_id="place_route_none",
+            lat=37.501,
+            lng=127.0,
+            price_krw=42000,
+        ),
+        scoring_config=_venue_scoring(),
+        lat=37.5,
+        lng=127.0,
+        radius_m=1500,
+        budget_mode="soft",
+        now=NOW,
+        distance_provider=FallbackVenueDistanceProvider(
+            primary=MapRouteDistanceProvider(_MapRouteDistanceClient(None)),
+        ),
+    )
+
+    assert score is not None
+    assert score.source_snapshot["distance_strategy"] == "straight_line_mvp"
+    assert score.source_snapshot["distance_source"] == "venue_snapshot_coordinates"
+    assert score.source_snapshot["is_route_distance"] is False
+    assert score.source_snapshot["distance_fallback_used"] is True
+    assert score.source_snapshot["route_distance_m"] is None
+
+
+def test_fallback_distance_provider_uses_straight_line_when_route_invalid() -> None:
+    score = score_venue_candidate(
+        profile=_profile(),
+        selected_beverage=_beverage(),
+        candidate=_candidate(
+            place_id="place_route_invalid",
+            lat=37.501,
+            lng=127.0,
+            price_krw=42000,
+        ),
+        scoring_config=_venue_scoring(),
+        lat=37.5,
+        lng=127.0,
+        radius_m=1500,
+        budget_mode="soft",
+        now=NOW,
+        distance_provider=FallbackVenueDistanceProvider(
+            primary=_InvalidRouteDistanceProvider(),
+        ),
+    )
+
+    assert score is not None
+    assert score.source_snapshot["distance_strategy"] == "straight_line_mvp"
+    assert score.source_snapshot["distance_source"] == "venue_snapshot_coordinates"
+    assert score.source_snapshot["is_route_distance"] is False
+    assert score.source_snapshot["distance_fallback_used"] is True
+    assert score.source_snapshot["route_distance_m"] is None
+    assert score.source_snapshot["straight_line_distance_m"] == score.distance_m
+
+
+def test_invalid_distance_provider_excludes_candidate_without_fallback() -> None:
+    score = score_venue_candidate(
+        profile=_profile(),
+        selected_beverage=_beverage(),
+        candidate=_candidate(place_id="place_invalid_route", price_krw=42000),
+        scoring_config=_venue_scoring(),
+        lat=37.5,
+        lng=127.0,
+        radius_m=1500,
+        budget_mode="soft",
+        now=NOW,
+        distance_provider=_InvalidRouteDistanceProvider(),
+    )
+
+    assert score is None
+
+
+def test_service_uses_injected_route_distance_provider_in_request_logs() -> None:
+    beverage = _beverage()
+    profile = _profile()
+    candidate = _candidate(place_id="place_route", price_krw=42000)
+    service, added = _venue_service_with_candidates(
+        selected_beverage=beverage,
+        profile=profile,
+        candidates=(candidate,),
+        distance_provider=_RouteDistanceProvider(),
+    )
+
+    response = service.get_venue_recommendations(
+        external_user_id=profile.external_user_id,
+        selected_beverage_id=str(beverage.id),
+        lat=37.5,
+        lng=127.0,
+        radius_m=1500,
+        limit=1,
+        budget_mode="soft",
+        now=NOW,
+    )
+
+    assert response.results[0].source_metadata["distance_strategy"] == (
+        "map_route_estimate_v1"
+    )
+    request = _first_added(added, RecommendationRequest)
+    assert request.request_context_json["distance_strategy"] == (
+        "map_route_estimate_v1"
+    )
+    assert request.request_context_json["is_route_distance"] is True
+    assert request.request_context_json["distance_sources"] == [
+        "map_service_route_api",
+    ]
+    assert request.request_context_json["distance_result_count"] == 1
+    assert request.request_context_json["route_distance_result_count"] == 1
+    assert request.request_context_json["straight_line_distance_result_count"] == 0
+    assert request.request_context_json["fallback_distance_result_count"] == 0
+    assert request.request_context_json["unknown_distance_result_count"] == 0
+    assert request.request_context_json["distance_route_coverage"] == 1.0
+    assert request.request_context_json["distance_strategy_counts"] == {
+        "map_route_estimate_v1": 1,
+    }
+    assert request.request_context_json["distance_source_counts"] == {
+        "map_service_route_api": 1,
+    }
+
+    explanation = _first_added(added, RecommendationExplanation)
+    assert explanation.debug_json["distance_strategy"] == "map_route_estimate_v1"
+    assert explanation.debug_json["is_route_distance"] is True
+
+
+def test_service_does_not_count_default_straight_line_as_fallback() -> None:
+    beverage = _beverage()
+    profile = _profile()
+    candidate = _candidate(
+        place_id="place_straight_line",
+        lat=37.5002,
+        lng=127.0,
+        price_krw=42000,
+    )
+    service, added = _venue_service_with_candidates(
+        selected_beverage=beverage,
+        profile=profile,
+        candidates=(candidate,),
+        distance_provider=StraightLineVenueDistanceProvider(),
+    )
+
+    response = service.get_venue_recommendations(
+        external_user_id=profile.external_user_id,
+        selected_beverage_id=str(beverage.id),
+        lat=37.5,
+        lng=127.0,
+        radius_m=1500,
+        limit=1,
+        budget_mode="soft",
+        now=NOW,
+    )
+
+    assert response.results[0].source_metadata["distance_strategy"] == (
+        "straight_line_mvp"
+    )
+    assert response.results[0].source_metadata["distance_fallback_used"] is False
+    request = _first_added(added, RecommendationRequest)
+    assert request.request_context_json["distance_strategy"] == "straight_line_mvp"
+    assert request.request_context_json["is_route_distance"] is False
+    assert request.request_context_json["distance_result_count"] == 1
+    assert request.request_context_json["route_distance_result_count"] == 0
+    assert request.request_context_json["straight_line_distance_result_count"] == 1
+    assert request.request_context_json["fallback_distance_result_count"] == 0
+    assert request.request_context_json["distance_route_coverage"] == 0.0
+
+
+def test_service_logs_mixed_distance_strategy_on_partial_route_fallback() -> None:
+    beverage = _beverage()
+    profile = _profile()
+    route_candidate = _candidate(
+        place_id="place_route",
+        lat=37.5002,
+        lng=127.0,
+        price_krw=43000,
+    )
+    fallback_candidate = _candidate(
+        place_id="place_fallback",
+        lat=37.5004,
+        lng=127.0,
+        price_krw=42000,
+    )
+    service, added = _venue_service_with_candidates(
+        selected_beverage=beverage,
+        profile=profile,
+        candidates=(route_candidate, fallback_candidate),
+        distance_provider=FallbackVenueDistanceProvider(
+            primary=_SelectiveRouteDistanceProvider({"place_route"}),
+        ),
+    )
+
+    response = service.get_venue_recommendations(
+        external_user_id=profile.external_user_id,
+        selected_beverage_id=str(beverage.id),
+        lat=37.5,
+        lng=127.0,
+        radius_m=1500,
+        limit=2,
+        budget_mode="soft",
+        now=NOW,
+    )
+
+    assert len(response.results) == 2
+    strategies = {
+        item.source_metadata["distance_strategy"] for item in response.results
+    }
+    assert strategies == {"map_route_estimate_v1", "straight_line_mvp"}
+
+    request = _first_added(added, RecommendationRequest)
+    assert request.request_context_json["distance_strategy"] == (
+        "mixed_distance_strategy"
+    )
+    assert request.request_context_json["distance_strategies"] == [
+        "map_route_estimate_v1",
+        "straight_line_mvp",
+    ]
+    assert request.request_context_json["distance_sources"] == [
+        "map_service_route_api",
+        "venue_snapshot_coordinates",
+    ]
+    assert request.request_context_json["is_route_distance"] is True
+    assert request.request_context_json["distance_result_count"] == 2
+    assert request.request_context_json["route_distance_result_count"] == 1
+    assert request.request_context_json["straight_line_distance_result_count"] == 1
+    assert request.request_context_json["fallback_distance_result_count"] == 1
+    assert request.request_context_json["unknown_distance_result_count"] == 0
+    assert request.request_context_json["distance_route_coverage"] == 0.5
+    assert request.request_context_json["distance_strategy_counts"] == {
+        "map_route_estimate_v1": 1,
+        "straight_line_mvp": 1,
+    }
+    assert request.request_context_json["distance_source_counts"] == {
+        "map_service_route_api": 1,
+        "venue_snapshot_coordinates": 1,
+    }
+
+
+def test_service_logs_no_distance_results_when_no_venues_rank() -> None:
+    beverage = _beverage()
+    profile = _profile()
+    service, added = _venue_service_with_candidates(
+        selected_beverage=beverage,
+        profile=profile,
+        candidates=(),
+        distance_provider=StraightLineVenueDistanceProvider(),
+    )
+
+    response = service.get_venue_recommendations(
+        external_user_id=profile.external_user_id,
+        selected_beverage_id=str(beverage.id),
+        lat=37.5,
+        lng=127.0,
+        radius_m=1500,
+        limit=2,
+        budget_mode="soft",
+        now=NOW,
+    )
+
+    assert response.results == ()
+    request = _first_added(added, RecommendationRequest)
+    assert request.request_context_json["distance_strategy"] == "no_distance_results"
+    assert request.request_context_json["distance_strategies"] == []
+    assert request.request_context_json["distance_sources"] == []
+    assert request.request_context_json["is_route_distance"] is False
+    assert request.request_context_json["distance_result_count"] == 0
+    assert request.request_context_json["route_distance_result_count"] == 0
+    assert request.request_context_json["straight_line_distance_result_count"] == 0
+    assert request.request_context_json["fallback_distance_result_count"] == 0
+    assert request.request_context_json["unknown_distance_result_count"] == 0
+    assert request.request_context_json["distance_route_coverage"] == 0.0
+    assert request.request_context_json["distance_strategy_counts"] == {}
+    assert request.request_context_json["distance_source_counts"] == {}
+
+
+def test_service_filters_venue_place_types_with_aliases_in_request_logs() -> None:
+    beverage = _beverage()
+    profile = _profile()
+    store_candidate = _candidate(
+        place_id="place_store",
+        place_type="liquor_shop",
+        lat=37.5001,
+        lng=127.0,
+        price_krw=42000,
+    )
+    bar_candidate = _candidate(
+        place_id="place_bar",
+        place_type="cocktail_bar",
+        lat=37.5002,
+        lng=127.0,
+        price_krw=44000,
+    )
+    outdoor_candidate = _candidate(
+        place_id="place_outdoor",
+        place_type="outdoor_spot",
+        lat=37.5003,
+        lng=127.0,
+        price_krw=43000,
+    )
+    service, added = _venue_service_with_candidates(
+        selected_beverage=beverage,
+        profile=profile,
+        candidates=(store_candidate, bar_candidate, outdoor_candidate),
+        distance_provider=StraightLineVenueDistanceProvider(),
+    )
+
+    response = service.get_venue_recommendations(
+        external_user_id=profile.external_user_id,
+        selected_beverage_id=str(beverage.id),
+        lat=37.5,
+        lng=127.0,
+        radius_m=1500,
+        limit=3,
+        budget_mode="soft",
+        place_types=("store",),
+        now=NOW,
+    )
+
+    assert [item.place_id for item in response.results] == ["place_store"]
+    assert response.results[0].place_type == "liquor_shop"
+    request = _first_added(added, RecommendationRequest)
+    assert request.filters_json["place_types"] == ["store"]
+    assert request.request_context_json["place_type_filter_policy"] == (
+        "venue_snapshot_place_type_filter_v1"
+    )
+    assert request.request_context_json["resolved_place_types"] == [
+        "bottle_shop",
+        "liquor_shop",
+        "store",
+    ]
+    assert request.request_context_json["candidate_count_before_place_type_filter"] == 3
+    assert request.request_context_json["candidate_count_after_place_type_filter"] == 1
+
+
+def test_service_rejects_unknown_venue_place_type_filter() -> None:
+    beverage = _beverage()
+    profile = _profile()
+    service, _added = _venue_service_with_candidates(
+        selected_beverage=beverage,
+        profile=profile,
+        candidates=(_candidate(place_id="place_store"),),
+        distance_provider=StraightLineVenueDistanceProvider(),
+    )
+
+    with pytest.raises(ValueError, match="unsupported venue place_type"):
+        service.get_venue_recommendations(
+            external_user_id=profile.external_user_id,
+            selected_beverage_id=str(beverage.id),
+            lat=37.5,
+            lng=127.0,
+            radius_m=1500,
+            limit=3,
+            budget_mode="soft",
+            place_types=("nightclub",),
+            now=NOW,
+        )
+
+
+class _RouteDistanceProvider:
+    def distance_for(
+        self,
+        candidate: VenueSnapshotCandidate,
+        *,
+        origin_lat: float,
+        origin_lng: float,
+        now: datetime,
+    ) -> VenueDistanceFeature | None:
+        return VenueDistanceFeature(
+            distance_m=900.0,
+            strategy="map_route_estimate_v1",
+            source="map_service_route_api",
+            confidence=0.9,
+            is_route_distance=True,
+            straight_line_distance_m=610.0,
+            route_distance_m=900.0,
+            route_duration_seconds=720,
+            route_complexity="moderate",
+        )
+
+
+class _MapRouteDistanceClient:
+    def __init__(self, estimate: MapRouteDistanceEstimate | None) -> None:
+        self._estimate = estimate
+        self.calls: list[dict[str, object]] = []
+
+    def route_distance(
+        self,
+        *,
+        place_id: str,
+        origin_lat: float,
+        origin_lng: float,
+        destination_lat: float,
+        destination_lng: float,
+        requested_at: datetime,
+    ) -> MapRouteDistanceEstimate | None:
+        self.calls.append(
+            {
+                "place_id": place_id,
+                "origin_lat": origin_lat,
+                "origin_lng": origin_lng,
+                "destination_lat": destination_lat,
+                "destination_lng": destination_lng,
+                "requested_at": requested_at,
+            },
+        )
+        return self._estimate
+
+
+class _Settings:
+    def __init__(
+        self,
+        *,
+        map_route_distance_enabled: bool,
+        map_route_distance_fallback_enabled: bool = True,
+    ) -> None:
+        self.map_route_distance_enabled = map_route_distance_enabled
+        self.map_route_distance_fallback_enabled = map_route_distance_fallback_enabled
+
+
+class _MissingRouteDistanceProvider:
+    def distance_for(
+        self,
+        candidate: VenueSnapshotCandidate,
+        *,
+        origin_lat: float,
+        origin_lng: float,
+        now: datetime,
+    ) -> VenueDistanceFeature | None:
+        return None
+
+
+class _InvalidRouteDistanceProvider:
+    def distance_for(
+        self,
+        candidate: VenueSnapshotCandidate,
+        *,
+        origin_lat: float,
+        origin_lng: float,
+        now: datetime,
+    ) -> VenueDistanceFeature | None:
+        return VenueDistanceFeature(
+            distance_m=900.0,
+            strategy="map_route_estimate_v1",
+            source="map_service_route_api",
+            confidence=1.4,
+            is_route_distance=True,
+            straight_line_distance_m=610.0,
+            route_distance_m=None,
+            route_duration_seconds=720,
+            route_complexity="moderate",
+        )
+
+
+class _SelectiveRouteDistanceProvider:
+    def __init__(self, routable_place_ids: set[str]) -> None:
+        self._routable_place_ids = routable_place_ids
+
+    def distance_for(
+        self,
+        candidate: VenueSnapshotCandidate,
+        *,
+        origin_lat: float,
+        origin_lng: float,
+        now: datetime,
+    ) -> VenueDistanceFeature | None:
+        if candidate.venue.place_id not in self._routable_place_ids:
+            return None
+        return VenueDistanceFeature(
+            distance_m=900.0,
+            strategy="map_route_estimate_v1",
+            source="map_service_route_api",
+            confidence=0.9,
+            is_route_distance=True,
+            straight_line_distance_m=50.0,
+            route_distance_m=900.0,
+            route_duration_seconds=720,
+            route_complexity="moderate",
+        )
+
+
+def _venue_service_with_candidates(
+    *,
+    selected_beverage: BeverageItem,
+    profile: TasteProfileRevision,
+    candidates: tuple[VenueSnapshotCandidate, ...],
+    distance_provider,
+) -> tuple[BeverageRecommendationService, list[object]]:
+    session = MagicMock(spec=Session)
+    added: list[object] = []
+    session.scalar.return_value = _venue_scoring()
+    session.add.side_effect = added.append
+
+    def flush() -> None:
+        for item in added:
+            if getattr(item, "id", None) is None:
+                item.id = uuid.uuid4()
+
+    session.flush.side_effect = flush
+    service = BeverageRecommendationService(
+        session,
+        active_scoring_config="scoring_v1",
+        venue_distance_provider=distance_provider,
+    )
+    service._profiles = _FakeProfiles(profile)  # noqa: SLF001
+    service._catalog = _FakeVenueCatalog(selected_beverage, candidates)  # noqa: SLF001
+    return service, added
+
+
+class _FakeProfiles:
+    def __init__(self, profile: TasteProfileRevision) -> None:
+        self._profile = profile
+
+    def get_active_profile_revision(self, external_user_id: str):
+        return self._profile
+
+
+class _FakeVenueCatalog:
+    def __init__(
+        self,
+        selected_beverage: BeverageItem,
+        candidates: tuple[VenueSnapshotCandidate, ...],
+    ) -> None:
+        self._selected_beverage = selected_beverage
+        self._candidates = candidates
+
+    def get_active_beverage_item(self, beverage_id: uuid.UUID) -> BeverageItem | None:
+        if beverage_id == self._selected_beverage.id:
+            return self._selected_beverage
+        return None
+
+    def list_selected_beverage_venue_candidates(
+        self,
+        *,
+        beverage_item_id: uuid.UUID,
+    ) -> tuple[VenueSnapshotCandidate, ...]:
+        return self._candidates
+
+
+def _first_added(items: list[object], model_type):
+    for item in items:
+        if isinstance(item, model_type):
+            return item
+    raise AssertionError(f"{model_type.__name__} was not added")
 
 
 def _beverage() -> BeverageItem:
@@ -216,6 +918,7 @@ def _venue_scoring() -> ScoringConfig:
 def _candidate(
     *,
     place_id: str,
+    place_type: str = "bottle_shop",
     lat: float = 37.5,
     lng: float = 127.0,
     status: str = "active",
@@ -231,7 +934,7 @@ def _candidate(
         place_id=place_id,
         place_revision=f"place_rev_{place_id}",
         name=f"Venue {place_id}",
-        place_type="bottle_shop",
+        place_type=place_type,
         address="Seoul",
         status=status,
         publication_status="published",

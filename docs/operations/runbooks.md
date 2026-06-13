@@ -69,7 +69,14 @@ python3 -m app.tools.evaluate_drink_recommendations \
 Rollback rule:
 
 ```text
-Never silently change `scoring_v1`; create or reactivate a versioned config.
+Never silently change an existing scoring version. Current default runtime
+target is `scoring_v3`; `scoring_v2` and `scoring_v1` remain rollback targets.
+
+Rollback example:
+
+```text
+ACTIVE_SCORING_CONFIG=scoring_v2
+```
 ```
 
 ## Qdrant Rebuild

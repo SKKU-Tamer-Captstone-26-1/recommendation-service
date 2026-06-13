@@ -34,6 +34,35 @@ WARNING_METADATA_KEYS = (
     "aliases_ko",
     "serving_context",
 )
+REQUIRED_IMAGE_FIELDS = (
+    "policy_version",
+    "image_candidate_id",
+    "image_kind",
+    "image_url",
+    "original_image_url",
+    "cache_key",
+    "cache_policy",
+    "display_url_source",
+    "alt_text_ko",
+    "source_url",
+    "source_type",
+    "license",
+    "license_url",
+    "attribution",
+    "display_policy",
+    "review_status",
+)
+ALLOWED_IMAGE_POLICY_VERSIONS = frozenset({"beverage_image_v1"})
+ALLOWED_IMAGE_DISPLAY_POLICIES = frozenset(
+    {"allowed_mvp_display_with_license_metadata"},
+)
+ALLOWED_IMAGE_REVIEW_STATUSES = frozenset(
+    {"source_checked_mvp_seed", "operator_approved"},
+)
+ALLOWED_IMAGE_CACHE_POLICIES = frozenset({"operator_managed_image_cache_v1"})
+ALLOWED_IMAGE_DISPLAY_URL_SOURCES = frozenset(
+    {"licensed_source_url", "operator_managed_cache"},
+)
 
 
 @dataclass(frozen=True)
@@ -288,6 +317,195 @@ def _audit_beverage_metadata(
                 **issue_context,
             ),
         )
+    _audit_image_metadata(metadata, issue_context, issues)
+
+
+def _audit_image_metadata(
+    metadata: dict[str, Any],
+    issue_context: dict[str, str | None],
+    issues: list[CatalogAuditIssue],
+) -> None:
+    image_url = _optional_string(metadata.get("image_url"))
+    alt_text_ko = _optional_string(metadata.get("image_alt_text_ko"))
+    image = metadata.get("image")
+
+    if image_url is None:
+        issues.append(
+            CatalogAuditIssue(
+                severity=CRITICAL,
+                code="missing_display_image",
+                message="active beverage is missing metadata_json.image_url",
+                **issue_context,
+            ),
+        )
+    elif not _is_https_url(image_url):
+        issues.append(
+            CatalogAuditIssue(
+                severity=CRITICAL,
+                code="invalid_display_image_url",
+                message="metadata_json.image_url must be a non-empty https URL",
+                **issue_context,
+            ),
+        )
+
+    if alt_text_ko is None:
+        issues.append(
+            CatalogAuditIssue(
+                severity=CRITICAL,
+                code="missing_image_alt_text_ko",
+                message="active beverage is missing metadata_json.image_alt_text_ko",
+                **issue_context,
+            ),
+        )
+
+    if not isinstance(image, dict):
+        issues.append(
+            CatalogAuditIssue(
+                severity=CRITICAL,
+                code="missing_image_metadata",
+                message="active beverage is missing metadata_json.image metadata",
+                **issue_context,
+            ),
+        )
+        return
+
+    missing_fields = [
+        field for field in REQUIRED_IMAGE_FIELDS if not _has_value(image.get(field))
+    ]
+    if missing_fields:
+        issues.append(
+            CatalogAuditIssue(
+                severity=CRITICAL,
+                code="missing_image_license_metadata",
+                message=f"metadata_json.image is missing fields: {missing_fields}",
+                **issue_context,
+            ),
+        )
+
+    nested_image_url = _optional_string(image.get("image_url"))
+    if nested_image_url is not None and not _is_https_url(nested_image_url):
+        issues.append(
+            CatalogAuditIssue(
+                severity=CRITICAL,
+                code="invalid_nested_image_url",
+                message="metadata_json.image.image_url must be a non-empty https URL",
+                **issue_context,
+            ),
+        )
+    original_image_url = _optional_string(image.get("original_image_url"))
+    if original_image_url is not None and not _is_https_url(original_image_url):
+        issues.append(
+            CatalogAuditIssue(
+                severity=CRITICAL,
+                code="invalid_original_image_url",
+                message="metadata_json.image.original_image_url must be an https URL",
+                **issue_context,
+            ),
+        )
+    if image_url and nested_image_url and image_url != nested_image_url:
+        issues.append(
+            CatalogAuditIssue(
+                severity=CRITICAL,
+                code="inconsistent_image_url",
+                message="metadata_json.image_url does not match image.image_url",
+                **issue_context,
+            ),
+        )
+
+    cache_key = _optional_string(image.get("cache_key"))
+    if cache_key is not None and not _is_relative_cache_key(cache_key):
+        issues.append(
+            CatalogAuditIssue(
+                severity=CRITICAL,
+                code="invalid_image_cache_key",
+                message=(
+                    "metadata_json.image.cache_key must be a relative object key"
+                ),
+                **issue_context,
+            ),
+        )
+
+    cache_policy = _optional_string(image.get("cache_policy"))
+    if cache_policy and cache_policy not in ALLOWED_IMAGE_CACHE_POLICIES:
+        issues.append(
+            CatalogAuditIssue(
+                severity=CRITICAL,
+                code="invalid_image_cache_policy",
+                message=f"unsupported image cache policy: {cache_policy}",
+                **issue_context,
+            ),
+        )
+
+    display_url_source = _optional_string(image.get("display_url_source"))
+    if (
+        display_url_source
+        and display_url_source not in ALLOWED_IMAGE_DISPLAY_URL_SOURCES
+    ):
+        issues.append(
+            CatalogAuditIssue(
+                severity=CRITICAL,
+                code="invalid_image_display_url_source",
+                message=f"unsupported image display URL source: {display_url_source}",
+                **issue_context,
+            ),
+        )
+
+    for field in ("source_url", "license_url"):
+        value = _optional_string(image.get(field))
+        if value is not None and not _is_https_url(value):
+            issues.append(
+                CatalogAuditIssue(
+                    severity=CRITICAL,
+                    code=f"invalid_image_{field}",
+                    message=f"metadata_json.image.{field} must be an https URL",
+                    **issue_context,
+                ),
+            )
+
+    policy_version = _optional_string(image.get("policy_version"))
+    if policy_version and policy_version not in ALLOWED_IMAGE_POLICY_VERSIONS:
+        issues.append(
+            CatalogAuditIssue(
+                severity=CRITICAL,
+                code="invalid_image_policy_version",
+                message=f"unsupported image policy version: {policy_version}",
+                **issue_context,
+            ),
+        )
+
+    display_policy = _optional_string(image.get("display_policy"))
+    if display_policy and display_policy not in ALLOWED_IMAGE_DISPLAY_POLICIES:
+        issues.append(
+            CatalogAuditIssue(
+                severity=CRITICAL,
+                code="invalid_image_display_policy",
+                message=f"unsupported image display policy: {display_policy}",
+                **issue_context,
+            ),
+        )
+
+    review_status = _optional_string(image.get("review_status"))
+    if review_status and review_status not in ALLOWED_IMAGE_REVIEW_STATUSES:
+        issues.append(
+            CatalogAuditIssue(
+                severity=CRITICAL,
+                code="invalid_image_review_status",
+                message=f"unsupported image review status: {review_status}",
+                **issue_context,
+            ),
+        )
+
+    if image.get("attribution_required") is True and not _has_value(
+        image.get("attribution"),
+    ):
+        issues.append(
+            CatalogAuditIssue(
+                severity=CRITICAL,
+                code="missing_required_image_attribution",
+                message="image requires attribution but attribution is missing",
+                **issue_context,
+            ),
+        )
 
 
 def _audit_flavor_profile(
@@ -538,6 +756,41 @@ def _metrics(
         if len(vector.vector) == len(TASTE_V1_DIMENSIONS)
         and _dimension_keys_are_complete(vector.vector_json)
     )
+    image_url_count = sum(
+        1
+        for beverage in beverages
+        if _optional_string((beverage.metadata_json or {}).get("image_url")) is not None
+    )
+    image_metadata_count = sum(
+        1 for beverage in beverages if _has_image_metadata(beverage.metadata_json or {})
+    )
+    image_license_metadata_count = sum(
+        1
+        for beverage in beverages
+        if _has_image_license_metadata(beverage.metadata_json or {})
+    )
+    image_cache_metadata_count = sum(
+        1
+        for beverage in beverages
+        if _has_image_cache_metadata(beverage.metadata_json or {})
+    )
+    image_attribution_required_count = sum(
+        1
+        for beverage in beverages
+        if _image_attribution_required(beverage.metadata_json or {})
+    )
+    image_kind_counts = Counter(
+        image["image_kind"]
+        for beverage in beverages
+        if isinstance((image := (beverage.metadata_json or {}).get("image")), dict)
+        and _optional_string(image.get("image_kind")) is not None
+    )
+    image_policy_counts = Counter(
+        image["policy_version"]
+        for beverage in beverages
+        if isinstance((image := (beverage.metadata_json or {}).get("image")), dict)
+        and _optional_string(image.get("policy_version")) is not None
+    )
     return {
         "active_beverages": len(beverages),
         "priced_beverages": priced_beverage_count,
@@ -554,6 +807,19 @@ def _metrics(
         "source_metadata_coverage": _ratio(source_metadata_count, len(beverages)),
         "reason_code_coverage": _ratio(reason_hints_count, len(beverages)),
         "alias_coverage": _ratio(alias_count, len(beverages)),
+        "image_url_coverage": _ratio(image_url_count, len(beverages)),
+        "image_metadata_coverage": _ratio(image_metadata_count, len(beverages)),
+        "image_license_metadata_coverage": _ratio(
+            image_license_metadata_count,
+            len(beverages),
+        ),
+        "image_cache_metadata_coverage": _ratio(
+            image_cache_metadata_count,
+            len(beverages),
+        ),
+        "image_attribution_required_count": image_attribution_required_count,
+        "image_kind_counts": dict(sorted(image_kind_counts.items())),
+        "image_policy_counts": dict(sorted(image_policy_counts.items())),
         "issue_counts": {
             CRITICAL: severity_counts.get(CRITICAL, 0),
             WARNING: severity_counts.get(WARNING, 0),
@@ -603,6 +869,50 @@ def _has_value(value: object) -> bool:
     if isinstance(value, list | tuple | dict | set):
         return bool(value)
     return True
+
+
+def _is_https_url(value: str) -> bool:
+    return value.startswith("https://") and len(value) > len("https://")
+
+
+def _has_image_metadata(metadata: dict[str, Any]) -> bool:
+    image = metadata.get("image")
+    return (
+        isinstance(image, dict)
+        and _optional_string(image.get("image_url")) is not None
+    )
+
+
+def _has_image_license_metadata(metadata: dict[str, Any]) -> bool:
+    image = metadata.get("image")
+    if not isinstance(image, dict):
+        return False
+    return all(_has_value(image.get(field)) for field in REQUIRED_IMAGE_FIELDS)
+
+
+def _has_image_cache_metadata(metadata: dict[str, Any]) -> bool:
+    image = metadata.get("image")
+    if not isinstance(image, dict):
+        return False
+    return (
+        _optional_string(image.get("original_image_url")) is not None
+        and _optional_string(image.get("cache_key")) is not None
+        and _optional_string(image.get("cache_policy")) is not None
+        and _optional_string(image.get("display_url_source")) is not None
+    )
+
+
+def _image_attribution_required(metadata: dict[str, Any]) -> bool:
+    image = metadata.get("image")
+    return isinstance(image, dict) and image.get("attribution_required") is True
+
+
+def _is_relative_cache_key(value: str) -> bool:
+    return (
+        not value.startswith(("/", "http://", "https://"))
+        and ".." not in value.split("/")
+        and bool(value.strip())
+    )
 
 
 def _ratio(numerator: int, denominator: int) -> float:
